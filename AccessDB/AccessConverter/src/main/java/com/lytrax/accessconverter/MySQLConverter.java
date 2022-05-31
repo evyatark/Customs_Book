@@ -1,8 +1,3 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
 package com.lytrax.accessconverter;
 
 import com.healthmarketscience.jackcess.Column;
@@ -25,18 +20,17 @@ import org.apache.commons.text.TextStringBuilder;
 /**
  *
  * @author Christos Lytras <christos.lytras@gmail.com>
+ * @author Evyatar Kafkafi <evyatar@tamuz.org.il>
  */
 public class MySQLConverter extends Converter {
     public final String DefaultCollate = "utf8mb4_unicode_ci";
     public final String DefaultCharset = "utf8mb4";
     public final String DefaultEngine = "InnoDB";
-    //public final int DefaultMaxInsertRows = 2;//100;
-    
+
     public String collate = DefaultCollate;
     public String charset = DefaultCharset;
     public String engine = DefaultEngine;
-    //public int maxInsertRows = DefaultMaxInsertRows;
-    
+
     public class AutoIncrement {
         public int maxId = 0;
         public String columnName;
@@ -48,7 +42,7 @@ public class MySQLConverter extends Converter {
     
     public Database db;
     public Args args;
-    //public List<String> lastError = new ArrayList<>();
+
     public Map<String, AutoIncrement> autoIncrements = new HashMap<>();
     public TextStringBuilder sqlDump;
 
@@ -58,11 +52,14 @@ public class MySQLConverter extends Converter {
         this.args = args;
         this.db = db;
     }
-    
+
+    /**
+     * Convert the accdb file to SQL INSERT statements
+     * @return boolean Success
+     */
     public boolean toMySQLDump() {
         boolean result = false;
         final String methodName = "toMySQLDump";
-        int ONLY_FIRST_TABLES = 4;
         List<String> exceptTheseTables = Arrays.asList(
             new String[]{
                         //"ComputationMethodData", // < - - too big even alone!
@@ -80,10 +77,8 @@ public class MySQLConverter extends Converter {
             Set<String> tableNames = db.getTableNames();
             int count = 0 ;
             for (String tableName : tableNames) {
-            //tableNames.forEach((tableName) -> {
                 try {
                     count = count + 1;
-                    //if (count > ONLY_FIRST_TABLES) break;
                     if (!onlyTheseTables.isEmpty()) {
                         // onlyTheseTables has names - do only those tables!!
                         if (!onlyTheseTables.contains(tableName)) {
@@ -93,25 +88,19 @@ public class MySQLConverter extends Converter {
                     else if (exceptTheseTables.contains(tableName)) {
                         continue;
                     }
-                    //Error(String.format("add table '%s'", tableName));
                     System.out.println("-- add table " + tableName + ", sqlDump length=" + sqlDump.length());
                     Table table = db.getTable(tableName);
-                    //AccessConverter.progressStatus.startTable(table);
                     addTableCreate(table);
                     addTableInsert(table);
                     addAutoIncrements();
-                    //AccessConverter.progressStatus.endTable();
                 } catch(IOException e) {
-                    //lastError.add(String.format("Could not load table '%s'", tableName));
                     Error(String.format("Could not load table '%s'", tableName), e, methodName);
                 }
-            };//);
+            }
             
             addFooter();
-            //AccessConverter.progressStatus.resetLine();
             result = true;
         } catch(IOException e) {
-            //lastError.add("Could not fetch tables from the database");
             Error("Could not fetch tables from the database", e, methodName);
         }
         
@@ -286,11 +275,9 @@ public class MySQLConverter extends Converter {
         }
         
         insertHeader.appendln(") VALUES");
-        //sqlDump.append(insertHeader);
-        
-        //boolean isFirstRow = true;
+
         boolean isFirstColumn;
-        int insertRows = 0;
+        //int insertRows = 0;
         int rowsCounter = 0 ;
         
         for(Row row : table) {
@@ -319,16 +306,12 @@ public class MySQLConverter extends Converter {
                             insertValues.append(row.getByte(name));
                             break;
                         case "INT":
-                            //insertValues.append(row.getShort(name));
                             insertValues.append(defaultIfNullShort(row.getShort(name), 0));
                             break;
                         case "LONG":
                             if(column.isAutoNumber() && autoIncrements.containsKey(tableName))
                                 autoIncrements.get(tableName).setMaxId(row.getInt(name));
-                            // int x = defaultIfNullInteger(row.getInt(name), 0);
-                            // System.out.println("-- long is /" + x + "/");
                             insertValues.append(defaultIfNullInteger(row.getInt(name), 0));
-                            //insertValues.append(row.getInt(name));
                             break;
                         case "FLOAT":
                             insertValues.append(row.getFloat(name));
@@ -355,9 +338,6 @@ public class MySQLConverter extends Converter {
                         case "MEMO":
                         case "GUID":
                         case "TEXT":
-                            //String val2 = row.getString(name);
-                            //insertValues.append("'TEMPORARILY_REMOVED'");
-                            /* */
                             // need special handling for TEXT values that are RTF, because \ ' b 3 causes crashes in import
                             String val2 = row.getString(name);
                             if (val2 == null) {
@@ -365,8 +345,6 @@ public class MySQLConverter extends Converter {
                             }
                             else if (name.endsWith("RTF")) {
                                 // temporary solution!! it will damage RTF content in unknown ways!!
-                                // val2 = val2.replace("\\'b3", "").replace("\\'f7", "").replace("\\'f", "").replace("\\'l", "");
-                                // insertValues.append(String.format("'%s'", val2.replace("'", "''")));
                                 // temporary solution!! completely delete RTF values
                                 insertValues.append("'TEMPORARILY_REMOVED_RTF'");
                             }
@@ -377,13 +355,11 @@ public class MySQLConverter extends Converter {
                             break;
                         case "COMPLEX_TYPE":
                         default:
-                            //insertValues.append("NULL");
                             insertValues.append("'UNKNOWN_TYPE_REMOVED'");
                             break;
                     }
                 } catch(NullPointerException e) {
                     insertValues.append("'EXCEPTION_REMOVED'");
-                    //insertValues.append("NULL");
                 }
             }
             
@@ -392,18 +368,7 @@ public class MySQLConverter extends Converter {
             
             sqlDump.append(insertHeader);
             sqlDump.append(insertValues);
-
-            // if(++insertRows >= maxInsertRows) {
-            //     insertValues.appendln(";");
-            //     sqlDump.append(insertValues);
-            //     insertRows = 0;
-            //     isFirstRow = true;
-            // }
         }
-        
-        // if(!isFirstRow) {
-        //     insertValues.appendln(";");
-        // }
 
     }
     

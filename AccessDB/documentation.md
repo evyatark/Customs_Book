@@ -29,7 +29,7 @@ The resulting file is in `/home/evyatar/Documents/custom/3/dump.sql`. for an acc
 
 ### Fat Jar
 The pom.xml instructs Maven to create a Fat Jar (uber-jar). This means all the dependent Jars are archived in one JAR that can be executed with `java -jar ...`
- 
+
 Maven-assembly-plugin is documented [here](https://maven.apache.org/plugins/maven-assembly-plugin/index.html) (current version at the time of writing is 3.3.0). There is an alternative way, with the [Maven Shade Plugin](https://maven.apache.org/plugins/maven-shade-plugin/), but for my purpose Maven-assembly-plugin is sufficient.
 Maven-compiler-plugin is documented [here](https://maven.apache.org/plugins/maven-compiler-plugin/index.html) (current version at the time of writing is 3.10.1).
 
@@ -49,6 +49,13 @@ Exception in thread "main" java.lang.OutOfMemoryError: Java heap space
 	at java.base/java.lang.StringBuilder.append(StringBuilder.java:174)
 ```
 it means that the memory allocated for the JVM is not enough. This is most probably because the accdb file is too big. You can allocate more memory by adding `-Xmx30g` to the command line (change 30g to whatever number suitable. The `g` denotes GigaBytes).
+
+
+## Current restrictions
+1. the code currently ignores columns with RTF (coulmn name ends with RTF) because it seems the Hebrew is not rendered correctly in the import file.
+2. the code currently does not copy full content to the tables ComputationMethodData (only first 1M rows), TariffDetailsHistory_777 (only first 100K rows).
+3. requires `-Xmx28g`, but without converting to String we only need `-Xmx6g`!
+
 
 ## To Do
 1. change code to create a separate SQL file for each table. Currently, some tables are still too big to handle properly.

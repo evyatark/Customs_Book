@@ -63,7 +63,9 @@ public class AccessConverter {
     public static String zipFilename = null;
     public static File zipFile = null;
     public static ProgressStatus progressStatus = null;
-    
+
+    private static boolean dumpToStdout = true;
+
     static {
         System.setProperty("org.apache.commons.logging.Log",
                            "org.apache.commons.logging.impl.NoOpLog");
@@ -155,12 +157,14 @@ public class AccessConverter {
         result = "";
         
         try {
+            // receive accdb file full path from command line argument --access-file "filename.accdb"
             File dbFile = new File(args.GetOption("access-file"));
             Database db = new DatabaseBuilder(dbFile).setReadOnly(true).open();
 
             progressStatus = new ProgressStatus(db);
             progressStatus.calculateAllRows();
-            
+
+            // command line argument e.g: --task convert-mysql-dump
             switch(args.GetOption("task")) {
                 case "convert-json":
                     JSONConverter jsonConverter = new JSONConverter(args, db);
@@ -177,46 +181,31 @@ public class AccessConverter {
                         Log(String.format("Could not convert '%s' to JSON", args.GetOption("access-file")));
                     }
                     break;
+
+                // only this one was tested:
                 case "convert-mysql-dump":
                     MySQLConverter mysqlConverter = new MySQLConverter(args, db);
                     
-                    if(mysqlConverter.toMySQLDump()) {
-                        System.out.println("-- sqlDump 1");
+                    if (mysqlConverter.toMySQLDump()) {
+                        System.out.println("-- mysqlConverter.toMySQLDump() completed");
                         outputFile = getOutputFile("sql");
 
                         if(outputFile != null) {
+                            //dumpToStdout = false ;  // temporary!!
                             System.out.println("-- sqlDump length=" + mysqlConverter.sqlDump.length() + " capacity=" + mysqlConverter.sqlDump.capacity() + " size=" + mysqlConverter.sqlDump.size());
-                            System.out.println("-- sqlDump 2");
-                            String all1 = convertToString(mysqlConverter);
-                            System.out.println("-- sqlDump 3");
-                            System.out.println(all1);
-/*
-                            String drop = "DROP TABLE IF EXISTS";
-                            int index = 0 ;
-                            int index1 = 0 ;
-                            int prev = 0 ;
-                            String all = "";
-                            while (index1 >= 0) {
-                                index1 = mysqlConverter.sqlDump.indexOf(drop, index);
-                                if (index1 >=0) {
-                                    index = index1 + drop.length();
-                                    //System.out.println("MySQL DROP TABLE at " + index1);
-                                    String strPart = mysqlConverter.sqlDump.substring(prev, index1);
-                                    all = all + strPart;
-                                    //System.out.println(strPart.length() + " / " + all.length());
-                                    prev = index1;
-                                    //Log(String.format("MySQL DROP TABLE at '%s'", index1));
-                                }
+                            if (dumpToStdout) {
+                                System.out.println("-- dumping to stdout...");
+                                dumpToStdout(mysqlConverter);   // instead of converting to String, because in any case we just want to print it to stdout
+//                                System.out.println("-- converting to String...");
+//                                String all1 = convertToString(mysqlConverter);
+//                                System.out.println("-- content of mysqlConverter converted to String");
+//                                System.out.println(all1);
+                                Log(String.format("MySQL dump file '%s' created successfully", outputFilename));    // this reaches the log file but is not written to stdout
                             }
-                            System.out.println("-- completed, " + all.length());
-                            //String part = mysqlConverter.sqlDump.substring(0, 10000);
-                            Log(String.format("writing SQL statements to output file '%s'", outputFilename));
-                            //FileUtils.write(outputFile, all, "UTF-8");
-                            qall);
-*/
-                            //Log(String.format("sqlDump length= '%s' capacity= '%s' size='%s'", mysqlConverter.sqlDump.length(), mysqlConverter.sqlDump.capacity(), mysqlConverter.sqlDump.size()));
-                            Log(String.format("MySQL dump file '%s' created successfully", outputFilename));
-                            result = "success";
+                            result = "success"; // this value is used only if compress to zip is required (args.HasFlag("compress")==True)
+                        }
+                        else {
+                            Error("output file was not created");
                         }
                     } else {
                         Error(String.format("Could not convert '%s' to MySQL dump file", args.GetOption("access-file")));
@@ -240,13 +229,30 @@ public class AccessConverter {
                     break;
             }
             
-            if("success".equals(result) && args.HasFlag("compress") && outputFile != null)
+            if("success".equals(result) && args.HasFlag("compress") && outputFile != null) {
                 Compress();
+            }
         } catch(IOException e) {
             Error("Can't open Access file", e);
         }
     }
-    
+
+    private static void dumpToStdout(MySQLConverter mysqlConverter) {
+        int length = mysqlConverter.sqlDump.length();
+        System.out.println("-- dumpToStdout 1, length=" + length);
+        int STEP = 10000000;
+        int index = STEP ;
+        int prev = 0;
+        while (index < length) {
+            String strPart = mysqlConverter.sqlDump.substring(prev, index);
+            System.out.println(strPart);
+            prev = index;
+            index = index + STEP;
+        }
+        String strPart = mysqlConverter.sqlDump.substring(prev, length);
+        System.out.println(strPart);
+    }
+
     private static String convertToString(MySQLConverter mysqlConverter) {
         String all = "";
         int length = mysqlConverter.sqlDump.length();
@@ -257,16 +263,23 @@ public class AccessConverter {
         while (index < length) {
             //System.out.println("" + index);
             String strPart = mysqlConverter.sqlDump.substring(prev, index);
-            all = all + strPart;
+            //temporary comment: all = all + strPart;
             prev = index;
             index = index + STEP;
         }
         String strPart = mysqlConverter.sqlDump.substring(prev, length);
         //System.out.println("" + length);
-        all = all + strPart;
+        //temporary comment: all = all + strPart;
         return all;
     }
 
+    /**
+     * creates a File whose name is as defined by command line argument --output-file
+     * If this command line argument was not supplied, the output file name will be according
+     * to the name of the access-file (with extension as specified by this method argument)
+     * @param extension
+     * @return
+     */
     private static File getOutputFile(String extension) {
         outputFilename = args.HasOption("output-file") ? 
                 args.GetOption("output-file") : 

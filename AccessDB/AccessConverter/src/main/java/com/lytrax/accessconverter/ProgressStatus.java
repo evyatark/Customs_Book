@@ -151,6 +151,7 @@ public class ProgressStatus {
     }
     
     public boolean calculateAllRows() {
+        // this method works only if command line argument --show-progress was given
         if(!this.enabled) return false;
         
         this.update();
