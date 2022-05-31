@@ -4,8 +4,8 @@ Note: all command line is Linux (Ubuntu 20.04). For Mac users it should be the s
 ## How to operate
 
 ### Prerequisites
-- For running an already prepared JAR file, you need to install JDK 8 on your machine.
-  - Installing and using Java requires some experience. I recommend using `sdkman`, but you can also install JDK directly
+- For running an already prepared JAR file, you need to install JDK 8 on your machine. (or JDK 11? the pom.xml compiles for 1.8, but it seems my JDK11 can run this)
+  - Installing and using Java requires some experience. I recommend using `sdkman`, but you can also install JDK directly.
   - in command line do `java --version` to see if you have a JDK and what version it is.
 - For building the JAR, you need to install Maven on your machine (Alternatively, if you already have the JAR file, you don't need Maven to execute it, only JDK)
   - in command line do `mvn --version` to see if you have Maven installed.
@@ -22,10 +22,11 @@ mvn package
 if successful, it creates a JAR file in `./target` sub-directory.
 To execute:
 ```
-java -Xmx28g -cp ./target/accessconverter-1.1.1.jar:/home/evyatar/.m2/repository/javax/json/javax.json-api/1.0/javax.json-api-1.0.jar:/home/evyatar/.m2/repository/commons-io/commons-io/2.5/commons-io-2.5.jar:/home/evyatar/.m2/repository/org/glassfish/javax.json/1.0.1/javax.json-1.0.1.jar:/home/evyatar/.m2/repository/com/healthmarketscience/jackcess/jackcess/2.1.8/jackcess-2.1.8.jar:/home/evyatar/.m2/repository/commons-logging/commons-logging/1.2/commons-logging-1.2.jar:/home/evyatar/.m2/repository/org/apache/commons/commons-lang3/3.6/commons-lang3-3.6.jar:/home/evyatar/.m2/repository/commons-lang/commons-lang/2.6/commons-lang-2.6.jar:/home/evyatar/.m2/repository/org/apache/commons/commons-text/1.3/commons-text-1.3.jar com.lytrax.accessconverter.AccessConverter --access-file "/home/evyatar/Downloads/custom/1/fullCustomsBookData/AccessDBTamplate20220411.accdb" --task convert-mysql-dump --output-file "/home/evyatar/Downloads/custom/3/somedb_dump.sql" --log-file "/home/evyatar/Downloads/custom/3/somedb.log"  -mysql-drop-tables --output-result normal > ../../3/dump.sql
+java -Xmx28g -cp ./target/accessconverter-1.1.1.jar:/home/evyatar/.m2/repository/javax/json/javax.json-api/1.0/javax.json-api-1.0.jar:/home/evyatar/.m2/repository/commons-io/commons-io/2.5/commons-io-2.5.jar:/home/evyatar/.m2/repository/org/glassfish/javax.json/1.0.1/javax.json-1.0.1.jar:/home/evyatar/.m2/repository/com/healthmarketscience/jackcess/jackcess/2.1.8/jackcess-2.1.8.jar:/home/evyatar/.m2/repository/commons-logging/commons-logging/1.2/commons-logging-1.2.jar:/home/evyatar/.m2/repository/org/apache/commons/commons-lang3/3.6/commons-lang3-3.6.jar:/home/evyatar/.m2/repository/commons-lang/commons-lang/2.6/commons-lang-2.6.jar:/home/evyatar/.m2/repository/org/apache/commons/commons-text/1.3/commons-text-1.3.jar com.lytrax.accessconverter.AccessConverter --access-file "/home/evyatar/Documents/custom/1/fullCustomsBookData/AccessDBTamplate20220411.accdb" --task convert-mysql-dump --output-file "/home/evyatar/Downloads/custom/3/somedb_dump.sql" --log-file "/home/evyatar/Documents/custom/3/somedb.log"  -mysql-drop-tables --output-result normal > /home/evyatar/Documents/custom/3/dump.sql
 ```
 
-The resulting file is in `../../3/dump.sql`
+The resulting file is in `/home/evyatar/Documents/custom/3/dump.sql`. for an accdb file of 1.1GB, the dump.sql file is 960MB (after ignoring the 2 largest tables!)
+
 
 ### Troubleshhooting
 1. if the `mvn package` command does not work, try first `mvn --version` - just to see if that works
@@ -34,3 +35,27 @@ The resulting file is in `../../3/dump.sql`
 4. The `java` command has `-Xmx28g` which requires a **lot** of memory (28 GB!). If your machine does not have so much memory, change it to `-Xmx1g` or any other value. The large amount of memory is required to convert the large accdb. If you have a smaller accdb file, you will need less memory
 5. in the java command line you should change all paths to the correct paths on your machine.
 6. I plan to change the pom.xml file to build a "fat" JAR, and then I wouldn't need to supply JARs in the classpath with the `-cp` .
+7. the `/home/evyatar/.m2/` in the classpath assumes that your Maven has its local reposiroty at /home/evyatar/.m2 - this is its default (change `evyatar` to your user name!)
+8. if you receive the following error message
+```
+Exception in thread "main" java.lang.OutOfMemoryError: Java heap space
+	at java.base/java.util.Arrays.copyOf(Arrays.java:3745)
+	at java.base/java.lang.AbstractStringBuilder.ensureCapacityInternal(AbstractStringBuilder.java:172)
+	at java.base/java.lang.AbstractStringBuilder.append(AbstractStringBuilder.java:538)
+	at java.base/java.lang.StringBuilder.append(StringBuilder.java:174)
+```
+it means that the memory allocated for the JVM is not enough. This is most probably because the accdb file is too big. You can allocate more memory by adding `-Xmx30g` to the command line (change 30g to whatever number suitable. The `g` denotes GigaBytes).
+
+## To Do
+1. change the pom.xml file to build a "fat" JAR
+2. change code to create a separate SQL file for each table. Currently, some tables are still too big to handle properly.
+3. change code to enable defining in arguments which table to convert
+
+
+
+java -Xmx28g -cp ./target/accessconverter-1.1.1.jar:/home/evyatar/.m2/repository/javax/json/javax.json-api/1.0/javax.json-api-1.0.jar:/home/evyatar/.m2/repository/commons-io/commons-io/2.5/commons-io-2.5.jar:/home/evyatar/.m2/repository/org/glassfish/javax.json/1.0.1/javax.json-1.0.1.jar:/home/evyatar/.m2/repository/com/healthmarketscience/jackcess/jackcess/2.1.8/jackcess-2.1.8.jar:/home/evyatar/.m2/repository/commons-logging/commons-logging/1.2/commons-logging-1.2.jar:/home/evyatar/.m2/repository/org/apache/commons/commons-lang3/3.6/commons-lang3-3.6.jar:/home/evyatar/.m2/repository/commons-lang/commons-lang/2.6/commons-lang-2.6.jar:/home/evyatar/.m2/repository/org/apache/commons/commons-text/1.3/commons-text-1.3.jar com.lytrax.accessconverter.AccessConverter --access-file "/home/evyatar/Documents/custom/1/fullCustomsBookData/AccessDBTamplate20220411.accdb" --task convert-mysql-dump --output-file "/home/evyatar/Downloads/custom/3/somedb_dump.sql" --log-file "/home/evyatar/Documents/custom/3/somedb.log"  -mysql-drop-tables --output-result normal > /home/evyatar/Documents/custom/3/dump.sql
+
+with fat jar:
+```
+java -cp ./target/access-converter-jar-with-dependencies.jar com.lytrax.accessconverter.AccessConverter --access-file "/home/evyatar/Documents/custom/1/fullCustomsBookData/AccessDBTamplate20220411.accdb" --task convert-mysql-dump --output-file "/home/evyatar/Downloads/custom/3/somedb_dump.sql" --log-file "/home/evyatar/Documents/custom/3/somedb.log"  -mysql-drop-tables --output-result normal > /home/evyatar/Documents/custom/3/dump.sql
+```
