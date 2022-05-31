@@ -1,0 +1,15 @@
+*.accdb
+*.mdb
+*.json
+*.zip
+*.sql
+*.sqlite3
+.idea/
+.settings/
+dist/
+build/
+target/
+releases/
+/*.jar
+nbproject/private/private.properties
+Test_SQLite_quotes.png
