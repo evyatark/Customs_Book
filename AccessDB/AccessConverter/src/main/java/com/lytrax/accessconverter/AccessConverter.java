@@ -196,10 +196,6 @@ public class AccessConverter {
                             if (dumpToStdout) {
                                 System.out.println("-- dumping to stdout...");
                                 dumpToStdout(mysqlConverter);   // instead of converting to String, because in any case we just want to print it to stdout
-//                                System.out.println("-- converting to String...");
-//                                String all1 = convertToString(mysqlConverter);
-//                                System.out.println("-- content of mysqlConverter converted to String");
-//                                System.out.println(all1);
                                 Log(String.format("MySQL dump file '%s' created successfully", outputFilename));    // this reaches the log file but is not written to stdout
                             }
                             result = "success"; // this value is used only if compress to zip is required (args.HasFlag("compress")==True)

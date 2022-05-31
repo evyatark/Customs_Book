@@ -66,11 +66,11 @@ public class MySQLConverter extends Converter {
                         //"TariffDetailsHistory_777"
                         });
         List<String> onlyTheseTables = Arrays.asList(
-            new String[]{//"ComputationMethodData", 
+            new String[]{"ComputationMethodData",
                         //"TariffDetailsHistory_777"  // fields Title and TariffNote are . This table alone is 1.8GB! (2.3M rows)
                         });
-        maxRowsInTable.put("ComputationMethodData", 1_000_000);
-        maxRowsInTable.put("TariffDetailsHistory_777", 100_000);  // it has 2.3M rows
+        maxRowsInTable.put("ComputationMethodData", 1_000_000); // exception in row 3327967
+        //maxRowsInTable.put("TariffDetailsHistory_777", 100_000);  // it has 2.3M rows
         try {
             sqlDump = new TextStringBuilder();
             addHeader();
@@ -282,9 +282,9 @@ public class MySQLConverter extends Converter {
         
         for(Row row : table) {
             rowsCounter = rowsCounter + 1;
-            if (maxRowsInTable.containsKey(tableName) && rowsCounter > maxRowsInTable.get(tableName)) {
-                break;
-            }
+//            if (maxRowsInTable.containsKey(tableName) && rowsCounter > maxRowsInTable.get(tableName)) {
+//                break;
+//            }
 
             TextStringBuilder insertValues = new TextStringBuilder();
 
@@ -365,9 +365,27 @@ public class MySQLConverter extends Converter {
             
             insertValues.append(")");
             insertValues.appendln(";");
-            
-            sqlDump.append(insertHeader);
-            sqlDump.append(insertValues);
+
+            try {
+                if (maxRowsInTable.containsKey(tableName) && rowsCounter > maxRowsInTable.get(tableName)) {
+                    // do not append to sqlDump, because it will cause OutOfMemory
+
+                    // dump sqlDump and start counting again
+                    dumpToStdout(sqlDump);
+                    sqlDump = null; // This should GC anything collected in sqlDump until now
+                    sqlDump = new TextStringBuilder();
+                    rowsCounter = 0 ;   // start counting again
+                }
+                //else {
+                {   // now this should be done in all cases, not just the else of the above if
+                    sqlDump.append(insertHeader);
+                    sqlDump.append(insertValues);
+                }
+            }
+            catch (Exception ex) {
+                System.out.println("-- absorbing Exception " + ex.getMessage() + " in table " + tableName + " in row " + rowsCounter);
+                break;  // out of loop of rows for the current table
+            }
         }
 
     }
@@ -392,5 +410,21 @@ public class MySQLConverter extends Converter {
                     autoIncrement.maxId + 1));
         }
         sqlDump.appendNewLine();
+    }
+
+    private static void dumpToStdout(TextStringBuilder sqlDump) {
+        int length = sqlDump.length();
+        System.out.println("-- dumpToStdout 1, length=" + length);
+        int STEP = 10000000;
+        int index = STEP ;
+        int prev = 0;
+        while (index < length) {
+            String strPart = sqlDump.substring(prev, index);
+            System.out.println(strPart);
+            prev = index;
+            index = index + STEP;
+        }
+        String strPart = sqlDump.substring(prev, length);
+        System.out.println(strPart);
     }
 }
