@@ -1,0 +1,26 @@
+The following example commands assume that the files are in /home/evyatar/Documents/custom/4/mysql_server.
+Change according to your own local environment.
+
+docker run \
+--detach \
+--name=mysql_server_custom_book \
+--env="MYSQL_ROOT_PASSWORD=123456" \
+--env="MYSQL_USER=evyatar_user" \
+--env="MYSQL_PASSWORD=123456" \
+--env="MYSQL_DATABASE=my_db_1" \
+--publish 3306:3306 \
+--volume=/home/evyatar/Documents/custom/4/mysql_server/server/conf.d:/etc/mysql/conf.d \
+mysql:5
+
+evyatar@dell-precision-3551:~/Documents/custom/4/mysql_server$ docker stop mysql_server_custom_book
+mysql_server_custom_book
+evyatar@dell-precision-3551:~/Documents/custom/4/mysql_server$ docker rm mysql_server_custom_book
+mysql_server_custom_book
+evyatar@dell-precision-3551:~/Documents/custom/4/mysql_server$
+
+docker run --detach --name=mysql_server_custom_book --env="MYSQL_ROOT_PASSWORD=123456" --env="MYSQL_USER=evyatar_user" --env="MYSQL_PASSWORD=123456" --env="MYSQL_DATABASE=my_db_1"  --volume=/home/evyatar/Documents/custom/4/mysql_server/server/conf.d:/etc/mysql/conf.d --publish 3306:3306 mysql:5
+
+Deleting the docker image (with docker rm) causes the deletion of the whole database!
+
+When you start a new docker image there is an empty database - you then must import a dump.sql file (using the MySql client). After that, use docker stop and docker start to stop/start the container.
+

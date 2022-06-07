@@ -1,0 +1,21 @@
+docker run --link mysql_server_custom_book:mysql --rm \
+-v /tmp/exports:/my_data \
+  sami/mysql-client \
+  mysql --host=localhost --user=evyatar_user --password=123456 --database=my_db_1 --execute='source dump1.sql;'
+
+evyatar@dell-precision-3551:~/Downloads/custom/4/mysql_client$ 
+docker run -v /tmp/exports:/home/evyatar/Downloads/custom/4/mysql_client/my_data --link mysql_server_custom_book:mysql --rm   sami/mysql-client   mysql --host=mysql --user=evyatar_user --password=123456 --database=my_db_1 --execute='show global variables like "max_connections";'
+
+Variable_name	Value
+max_connections	250
+
+evyatar@dell-precision-3551:~/Downloads/custom/4/mysql_client$
+docker run -v $(pwd)/my_data:/data --link mysql_server_custom_book:mysql --rm   sami/mysql-client   mysql --host=mysql --user=evyatar_user --password=123456 --database=my_db_1 --execute='source /data/dump.sql'
+
+or
+
+evyatar@dell-precision-3551:~/Documents/custom/3$ docker run -v $(pwd):/data --link mysql_server_custom_book:mysql --rm   sami/mysql-client   mysql --host=mysql --user=evyatar_user --password=123456 --database=my_db_1 --execute='source /data/dump.sql'
+
+To see only CREATE TABLE statements in dump.sql, use:
+grep "CREATE TABLE" -A50 dump.sql | grep -v INSERT | grep -v "^(" | grep -v "\-\-" | grep -v "^'," | grep -v "}"
+
