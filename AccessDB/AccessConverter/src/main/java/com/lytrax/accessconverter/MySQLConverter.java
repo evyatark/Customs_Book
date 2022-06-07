@@ -72,8 +72,8 @@ public class MySQLConverter extends Converter {
         // the following is required for very big tables - it causes sqlDump to be written to stdout
         // without waiting for the end of the table. You'll get an Exception OutOfMemoryError if the numbers
         // are not low enough. These numbers were reached with trial and error, when app is run with -Xmx10g.
-        maxRowsInTable.put("ComputationMethodData", 1_000_000); // exception in row 3327967
-        maxRowsInTable.put("TariffDetailsHistory_777", 1_000_000);  // it has 2.3M rows
+        maxRowsInTable.put("ComputationMethodData", 1_000_000); // has 3606595 rows
+        maxRowsInTable.put("TariffDetailsHistory_777", 1_000_000);  // it has 2335524 rows
         try {
             sqlDump = new TextStringBuilder();
             addHeader();
@@ -423,11 +423,11 @@ public class MySQLConverter extends Converter {
         int prev = 0;
         while (index < length) {
             String strPart = sqlDump.substring(prev, index);
-            System.out.println(strPart);
+            System.out.print(strPart);  // not println! because current string might end in the middle of an SQL statement
             prev = index;
             index = index + STEP;
         }
         String strPart = sqlDump.substring(prev, length);
-        System.out.println(strPart);
+        System.out.print(strPart);  // not println! because current string might end in the middle of an SQL statement
     }
 }

@@ -241,7 +241,7 @@ public class AccessConverter {
         int prev = 0;
         while (index < length) {
             String strPart = mysqlConverter.sqlDump.substring(prev, index);
-            System.out.println(strPart);
+            System.out.print(strPart);
             prev = index;
             index = index + STEP;
         }

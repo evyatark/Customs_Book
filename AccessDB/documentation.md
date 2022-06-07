@@ -13,7 +13,7 @@ Note: all command line is Linux (Ubuntu 20.04). For Mac users it should be the s
 ### building and executing
 in command line - move to the correct sub-directory (it is the sub-directory that contains a `pom.xml` file)
 ```
-cd ~/Documents/custom/accessConverter/AccessConverter
+cd ~/Documents/custom/GitHub/Customs_Book/AccessDB/AccessConverter
 ```
 Building the code is done with Maven (which is the standard way for Java projects).
 ```
