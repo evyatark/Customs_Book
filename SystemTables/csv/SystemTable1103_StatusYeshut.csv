@@ -1,0 +1,7 @@
+﻿"מזהה","שם","מצב","שם באנגלית"
+"1","טיוטה","1","Draft"
+"2","בתוקף","1","Actual"
+"3","ביטול הצעה","1","CancelledChangeRequest"
+"4","מבוטל","1","Canceled"
+"5","תקף ללא אישור","1","ValidWithoutAuthorization"
+"6","מבוטל - צו שעה","1","TemporaryCancelation"

@@ -1,0 +1,7 @@
+from
+https://www.gov.il/apps/taxes/systemtable/
+I selected each tabled and clicked the "download" icon.
+The file is downloaded by name "download.csv" - I renamed each file to "SystemTableNNNN_<table name>.csv"
+
+I did not find (yet) a way to download all tables, or several tables at once, or a programmatic way of download.
+
