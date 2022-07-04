@@ -48,3 +48,8 @@ To delete a cell, press `d` twice (like in vi editor!)
 CTRL+ENTER executes the curren cell. SHIFT+ENTER executes the current cell and moves to the next cell.
 
 In command mode, press Y to change current cell to `Code`, press M to change to `Markdown`
+
+
+## Working with Pandas
+see [this](./Pandas_Documentation.md) document.
+
