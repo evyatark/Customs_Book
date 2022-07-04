@@ -17,6 +17,13 @@ pyenv activate jupyter1
 pip3 install jupyter
 pip3 install pandas
 ```
+
+To work with Excel files, install 2 additional libraries
+
+```
+pip3 install openpyxl xlrd
+```
+
 3. Run Jupyter
 ```
 jupyter notebook
