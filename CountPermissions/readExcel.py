@@ -10,6 +10,7 @@ from bs4 import BeautifulSoup
 from urllib.parse import urlencode
 from urllib.request import urlopen, Request
 
+
 def make_request(url, headers=None, data=None):
     request = Request(url, headers=headers or {}, data=data)
     try:
@@ -22,6 +23,7 @@ def make_request(url, headers=None, data=None):
         print(error.reason)
     except TimeoutError:
         print("Request timed out")
+
 
 ''' retrieving the customsItemId from the FullClassification of customsItem
 (This requires a POST request to ShaarOlami)
@@ -44,6 +46,7 @@ def retrieveCustomsItemId(fullClassification):
     #print('id=', itemId)
     return itemId
 
+
 def removeUnPrintableCaracters(str):
     if str.isprintable():
         return str
@@ -55,9 +58,11 @@ def removeUnPrintableCaracters(str):
             ret = ret + '~'
     return ret
 
+
 def findTd(tr, index):
     #return "'" + tr.find_all("td")[index].text.strip() + "'"
     return tr.find_all("td")[index].text.strip()
+
 
 def findPageByUrl(url):
     page = urlopen(url)
@@ -65,7 +70,8 @@ def findPageByUrl(url):
     html = html_bytes.decode("utf-8")
     soup = BeautifulSoup(html, "html.parser")
     return soup
-    
+
+
 def parseDrishotTable(drishotTable):
     if not drishotTable:
         print('no Drishot')
@@ -82,6 +88,7 @@ def parseDrishotTable(drishotTable):
                  )
         drishotList.append(ishur)
     return drishotList
+
 
 '''
 receive a list of Ishurim details, parse and return list of unique ids of Ishurim
@@ -101,6 +108,7 @@ def parseIshurim(ishurimList):
                 setOfIshurIds.add(ishurId)
         #print(setOfIshurIds)
     return list(setOfIshurIds)
+
 
 '''
 usually ishurStr will be like:
@@ -126,6 +134,7 @@ def parseSugIshur(ishurStr):
     if (value.isnumeric()):
         return value
     return ''
+
 
 def scrapeAll(customsItemId):
     url = "https://shaarolami-query.customs.mof.gov.il/CustomspilotWeb/he/CustomsBook/Import/ImportCustomsItemDetails?customsItemId=" + str(customsItemId)
@@ -162,7 +171,8 @@ def scrapeAll(customsItemId):
     ishurIdList = parseIshurim(ishurim)
     print(ishurIdList)
     print('number of unique Ishurim=', len(ishurIdList))
-    return (fullClassification, customsItemId, len(ishurIdList))
+    return (customItem, customsItemId, len(ishurIdList))
+
 
 def readExcelFile(filename):
     df1 = pd.read_excel(filename, sheet_name=1)
@@ -188,8 +198,18 @@ def readExcelFile(filename):
     #print(df.tail(40))
     return df;
 
+
+def writeToExcelFile(df):
+    excel_file = pd.ExcelWriter("my_customs_items.xlsx")
+    df.to_excel(
+        excel_writer=excel_file, sheet_name="items", index=True
+    )
+    excel_file.save()
+
+
 def extractCustomItemsAsList(df):
     return df.index.values.tolist()
+
 
 def addNumberOfIshurimToDataFrame(df, listOfAllResults):
     print(listOfAllResults)
@@ -200,21 +220,22 @@ def addNumberOfIshurimToDataFrame(df, listOfAllResults):
     df = df.merge(df4, how="outer", left_on="Custom_Item", right_on="Custom_Item", indicator=False)
     df = df.sort_index()
     print(df.head(10))
+    return df
 
 
-if __name__ == "__main__":
+def main():
     NUMBER_OF_ITEMS_TO_SCRAPE = 12
     df = readExcelFile("./טבלה מרכזית.xlsx")
-    #print(df.tail(4))
+    # print(df.tail(4))
     customsItemFullClassificationList = extractCustomItemsAsList(df)
-    #print(customsItemFullClassificationList[1:10])
-    
+    # print(customsItemFullClassificationList[1:10])
+
     # list = [3460, 27189]
 
-    # for id in list: 
+    # for id in list:
     #     scrapeAll(id)
     #     retrieveCustomsItemId("2009129000")
-    
+
     listOfAllResults = []
     for fullClassification in customsItemFullClassificationList[0:NUMBER_OF_ITEMS_TO_SCRAPE]:
         itemId = retrieveCustomsItemId(fullClassification)
@@ -222,11 +243,16 @@ if __name__ == "__main__":
         print(fullClass, item, uniqueIshurim)
         # tup = scrapeAll(itemId)
         list1 = [fullClass, item, uniqueIshurim]
-        #print(list1[1], list1[2])
+        # print(list1[1], list1[2])
         listOfAllResults.append(list1)
 
     # print(listOfAllResults)
     # df4 = pd.DataFrame(listOfAllResults, columns = ['Custom_Item', 'itemId', 'numberOfIshurim'])
     # df4 = df4.set_index("Custom_Item")
     # print(df4)
-    addNumberOfIshurimToDataFrame(df, listOfAllResults)
+    resulting_df = addNumberOfIshurimToDataFrame(df, listOfAllResults)
+    writeToExcelFile(resulting_df)
+
+
+if __name__ == "__main__":
+    main()
