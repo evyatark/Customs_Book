@@ -2,6 +2,7 @@
 
 import pandas as pd
 import numpy as np
+import matplotlib.pyplot as plt
 
 # imports for scraping
 from urllib.request import urlopen
@@ -9,11 +10,13 @@ from bs4 import BeautifulSoup
 
 from urllib.parse import urlencode
 from urllib.request import urlopen, Request
+from urllib.error import HTTPError, URLError
+#import urllib.request
 
 import datetime
 
 NAME_OF_RESULTS_FILE = "my_customs_items.xlsx"
-NUMBER_OF_ITEMS_TO_SCRAPE = 24
+NUMBER_OF_ITEMS_TO_SCRAPE = 500
 
 
 def make_request(url, headers=None, data=None):
@@ -244,19 +247,10 @@ def extractCustomItemsAsList(df):
     return df.index.values.tolist()
 
 
-def previous_merge(df1, df2):
+def do_merge(df1, df2):
     df = df1.merge(df2, how="outer", left_on="Custom_Item", right_on="Custom_Item", indicator=False)
     return df
 
-
-def merge(df1, df2):
-    # consolidated columns, replacing instead of joining by ;
-    s_fixed_a = df['a'].fillna(df['a.1']).fillna(df['a.2'])
-    s_fixed_b = df['b'].fillna(df['b.1'])
-    # create new df
-    df_resulting = df[['Id', 'Name']].merge(s_fixed_a, left_index=True, right_index=True).merge(s_fixed_b,
-                                                                                                left_index=True,
-                                                                                                right_index=True)
 
 
 
@@ -265,10 +259,9 @@ def addNumberOfIshurimToDataFrame(df, listOfAllResults):
     df4 = pd.DataFrame(listOfAllResults, columns = ['Custom_Item', 'itemId', 'numberOfIshurim', 'full_classification_with_additional_digit', 'extracted_at_date'])
     df4 = df4.set_index("Custom_Item")
     print(df4)
-    #df = df.merge(df4, how="outer", left_on="Custom_Item", right_on="Custom_Item", indicator=False)
-    df = previous_merge(df, df4)
+    df = do_merge(df, df4)
     df = df.sort_index()
-    print(df.head(10))
+    #print(df.head(10))
     return df
 
 
@@ -331,18 +324,38 @@ def addToPreviousResults(existingDF):
 def scrapeAccordingToList(customsItemFullClassificationList, howManyItemsToScrape):
     listOfAllResults = []
     for fullClassification in customsItemFullClassificationList[0:howManyItemsToScrape]:
+        fullClassificationStr = str(fullClassification)
         itemId = retrieveCustomsItemId(fullClassification)
+        item = None
+        uniqueIshurim = None
+        fullClassWithAdditionalDigit = None
         if itemId == '':
             print('====>', fullClassification, 'no data found!')
-            continue  # no data found in CustomsBook web site for this item!
-        fullClassWithAdditionalDigit, item, uniqueIshurim = scrapeAll(itemId)
-        fullClassificationStr = str(fullClassification)
-        checkCorrectness(fullClassWithAdditionalDigit,
-                         fullClassificationStr)  # we already have the fullClassification without the additional digit. checking to be sure...
+            # no data found in CustomsBook web site for this item!
+            # but we do add a scraping date in the results df (so subsequent processing will know not to process this item again!)
+        else:
+            try:
+                fullClassWithAdditionalDigit, item, uniqueIshurim = scrapeAll(itemId)
+                checkCorrectness(fullClassWithAdditionalDigit, fullClassificationStr)  # we already have the fullClassification without the additional digit. checking to be sure...
+            except:
+                print('====> unknown error for item', fullClassificationStr)
         currentDate = str(datetime.datetime.now()).split(' ')[0]
         list1 = [fullClassificationStr, item, uniqueIshurim, fullClassWithAdditionalDigit, currentDate]
         listOfAllResults.append(list1)
     return listOfAllResults
+
+
+def do_some_plotting():
+    file_df = readExistingResultsFile()
+    condition_scraped_lines = file_df["numberOfIshurim"].notnull() & file_df["כמות היבואנים עם זיהוי"].notnull()
+    df = file_df[condition_scraped_lines]
+    #df["numberOfIshurim"].plot()
+    #plt.plot(df.index, df["numberOfIshurim"])
+    # Create scatter plot:
+    print('number of items:', df.shape[0])
+    plt.scatter(df["numberOfIshurim"], df["כמות היבואנים עם זיהוי"])
+    #plt.scatter(df["כמות היבואנים עם זיהוי"], df["numberOfIshurim"])
+    plt.show()
 
 
 def main():
@@ -351,7 +364,7 @@ def main():
         addToPreviousResults(existingDF)
     else:
         createIfNoPreviousResults()
-
+    do_some_plotting()
 
 
 def main1():
