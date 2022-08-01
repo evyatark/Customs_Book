@@ -12,6 +12,9 @@ from urllib.request import urlopen, Request
 
 import datetime
 
+NAME_OF_RESULTS_FILE = "my_customs_items.xlsx"
+NUMBER_OF_ITEMS_TO_SCRAPE = 24
+
 
 def make_request(url, headers=None, data=None):
     request = Request(url, headers=headers or {}, data=data)
@@ -203,16 +206,58 @@ def readExcelFile(filename):
     return df;
 
 
+def readExistingResultsFile():
+    df = None
+    try:
+        df = pd.read_excel(NAME_OF_RESULTS_FILE, sheet_name=0, index_col=0)
+    except FileNotFoundError:
+        print('file', NAME_OF_RESULTS_FILE, 'not found!')
+        return None
+    # change type
+    df.index = df.index.astype(str)
+    #df['Custom_Item'] = df['Custom_Item'].astype(str)
+    #df = df.set_index(['Custom_Item'])
+    return df
+
 def writeToExcelFile(df):
-    excel_file = pd.ExcelWriter("my_customs_items.xlsx")
+    excel_file = pd.ExcelWriter(NAME_OF_RESULTS_FILE)
     df.to_excel(
         excel_writer=excel_file, sheet_name="items", index=True
     )
     excel_file.save()
 
+'''
+if a results file already exists, some of its lines will contain an extraction date
+(for each item that was already extracted)
+We will use that information to not scrape items that were already scraped less than X days ago.
+'''
+def extractCustomItemsAsListFromExistingFile(df):
+    # the column named 'extracted_at_date' contains date when this item was extracted
+    condition = df["extracted_at_date"].isnull()
+    df1 = df[condition]
+    #print(df.head(5))
+    #print(df1.head(5))
+    return df1.index.values.tolist()
+
 
 def extractCustomItemsAsList(df):
     return df.index.values.tolist()
+
+
+def previous_merge(df1, df2):
+    df = df1.merge(df2, how="outer", left_on="Custom_Item", right_on="Custom_Item", indicator=False)
+    return df
+
+
+def merge(df1, df2):
+    # consolidated columns, replacing instead of joining by ;
+    s_fixed_a = df['a'].fillna(df['a.1']).fillna(df['a.2'])
+    s_fixed_b = df['b'].fillna(df['b.1'])
+    # create new df
+    df_resulting = df[['Id', 'Name']].merge(s_fixed_a, left_index=True, right_index=True).merge(s_fixed_b,
+                                                                                                left_index=True,
+                                                                                                right_index=True)
+
 
 
 def addNumberOfIshurimToDataFrame(df, listOfAllResults):
@@ -220,8 +265,8 @@ def addNumberOfIshurimToDataFrame(df, listOfAllResults):
     df4 = pd.DataFrame(listOfAllResults, columns = ['Custom_Item', 'itemId', 'numberOfIshurim', 'full_classification_with_additional_digit', 'extracted_at_date'])
     df4 = df4.set_index("Custom_Item")
     print(df4)
-
-    df = df.merge(df4, how="outer", left_on="Custom_Item", right_on="Custom_Item", indicator=False)
+    #df = df.merge(df4, how="outer", left_on="Custom_Item", right_on="Custom_Item", indicator=False)
+    df = previous_merge(df, df4)
     df = df.sort_index()
     print(df.head(10))
     return df
@@ -236,13 +281,98 @@ def checkCorrectness(fullClassWithAdditionalDigit, fullClassification):
         print('====> incorrect item full classification:', withoutLastDigit, fullClassification)
 
 
-def main():
-    NUMBER_OF_ITEMS_TO_SCRAPE = 3
-    df = readExcelFile("./טבלה מרכזית.xlsx")
-    # print(df.tail(4))
+def processItemsNeverScrapedBefore(df):
+    # the df contains columns as if read from original file ("./טבלה מרכזית.xlsx")
     customsItemFullClassificationList = extractCustomItemsAsList(df)
-    # print(customsItemFullClassificationList[1:10])
+    #   NUMBER_OF_ITEMS_TO_SCRAPE = 3
+    howManyItemsToScrape = NUMBER_OF_ITEMS_TO_SCRAPE
+    if len(customsItemFullClassificationList) < NUMBER_OF_ITEMS_TO_SCRAPE:
+        howManyItemsToScrape = customsItemFullClassificationList
+    if howManyItemsToScrape <= 0:
+        print('=====> No items to scrape!', 'All of', NUMBER_OF_ITEMS_TO_SCRAPE,
+              'were already scraped...')  # TODO at date...
+        exit(-1)
+    scrapingResults = scrapeAccordingToList(customsItemFullClassificationList, howManyItemsToScrape)
+    resulting_df = addNumberOfIshurimToDataFrame(df, scrapingResults)
+    return resulting_df
 
+def createIfNoPreviousResults():
+    df = readExcelFile("./טבלה מרכזית.xlsx")
+    print('not scraped:', df.shape[0])
+    resulting_df = processItemsNeverScrapedBefore(df)
+    writeToExcelFile(resulting_df)
+
+
+def divideExistingResultsDF(existingDF):
+    condition_scraped_lines = existingDF["extracted_at_date"].notnull()     # TODO expand this condition to include items that wre scraped more than X days ago
+    scraped_df = existingDF[condition_scraped_lines]
+    condition_non_scraped_lines = existingDF["extracted_at_date"].isnull()  # TODO same as above
+    not_scraped_df_all = existingDF[condition_non_scraped_lines]
+    # in not_scraped_df, remove the additional columns ("Custom_Item" is index)
+    not_scraped_df = not_scraped_df_all[[ "כמות היבואנים עם זיהוי", "כמות סוכנים", "ספירת הצהרות"]]
+    return scraped_df, not_scraped_df
+
+
+def addToPreviousResults(existingDF):
+    # existingDF already contains the content of the existing file
+    # we divide it to 2 dataFrames - one with the lines that already have scraping results,
+    # the other - with lines that were not processed
+    df_scraped, df_not_scraped = divideExistingResultsDF(existingDF)
+    print('already scraped:', df_scraped.shape[0])
+    print('not scraped:', df_not_scraped.shape[0])
+    print("==> scraping...")
+    results_of_new_scraped_df = processItemsNeverScrapedBefore(df_not_scraped)
+    # now concat df_scraped and results_of_new_scraped_df, they should have exactly the same columns!
+    concatenated_df = pd.concat(objs=[df_scraped, results_of_new_scraped_df])
+    writeToExcelFile(concatenated_df)   # this overwrites the previous file??
+
+
+
+def scrapeAccordingToList(customsItemFullClassificationList, howManyItemsToScrape):
+    listOfAllResults = []
+    for fullClassification in customsItemFullClassificationList[0:howManyItemsToScrape]:
+        itemId = retrieveCustomsItemId(fullClassification)
+        if itemId == '':
+            print('====>', fullClassification, 'no data found!')
+            continue  # no data found in CustomsBook web site for this item!
+        fullClassWithAdditionalDigit, item, uniqueIshurim = scrapeAll(itemId)
+        fullClassificationStr = str(fullClassification)
+        checkCorrectness(fullClassWithAdditionalDigit,
+                         fullClassificationStr)  # we already have the fullClassification without the additional digit. checking to be sure...
+        currentDate = str(datetime.datetime.now()).split(' ')[0]
+        list1 = [fullClassificationStr, item, uniqueIshurim, fullClassWithAdditionalDigit, currentDate]
+        listOfAllResults.append(list1)
+    return listOfAllResults
+
+
+def main():
+    existingDF = readExistingResultsFile()
+    if existingDF is not None:
+        addToPreviousResults(existingDF)
+    else:
+        createIfNoPreviousResults()
+
+
+
+def main1():
+    df = None
+    existingDF = readExistingResultsFile()
+    if existingDF is not None:
+        addToPreviousResults(existingDF)
+        customsItemFullClassificationList = extractCustomItemsAsListFromExistingFile(existingDF)
+        df = existingDF
+    else:
+        createIfNoPreviousResults()
+        df = readExcelFile("./טבלה מרכזית.xlsx")
+        customsItemFullClassificationList = extractCustomItemsAsList(df)
+
+    #   NUMBER_OF_ITEMS_TO_SCRAPE = 3
+    howManyItemsToScrape = NUMBER_OF_ITEMS_TO_SCRAPE
+    if len(customsItemFullClassificationList) < NUMBER_OF_ITEMS_TO_SCRAPE:
+        howManyItemsToScrape = customsItemFullClassificationList
+    if howManyItemsToScrape <= 0:
+        print('=====> No items to scrape!', 'All of', NUMBER_OF_ITEMS_TO_SCRAPE, 'were already scraped...') # TODO at date...
+        exit(-1)
     # list = [3460, 27189]
 
     # for id in list:
@@ -250,15 +380,16 @@ def main():
     #     retrieveCustomsItemId("2009129000")
 
     listOfAllResults = []
-    for fullClassification in customsItemFullClassificationList[0:NUMBER_OF_ITEMS_TO_SCRAPE]:
+    for fullClassification in customsItemFullClassificationList[0:howManyItemsToScrape]:
         itemId = retrieveCustomsItemId(fullClassification)
         if itemId == '':
             print('====>', fullClassification, 'no data found!')
             continue    # no data found in CustomsBook web site for this item!
         fullClassWithAdditionalDigit, item, uniqueIshurim = scrapeAll(itemId)
-        checkCorrectness(fullClassWithAdditionalDigit, fullClassification) # we already have the fullClassification without the additional digit. checking to be sure...
+        fullClassificationStr = str(fullClassification)
+        checkCorrectness(fullClassWithAdditionalDigit, fullClassificationStr) # we already have the fullClassification without the additional digit. checking to be sure...
         currentDate = str(datetime.datetime.now()).split(' ')[0]
-        list1 = [fullClassification, item, uniqueIshurim, fullClassWithAdditionalDigit, currentDate]
+        list1 = [fullClassificationStr, item, uniqueIshurim, fullClassWithAdditionalDigit, currentDate]
         listOfAllResults.append(list1)
 
     # print(listOfAllResults)
