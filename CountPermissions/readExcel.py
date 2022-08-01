@@ -10,6 +10,8 @@ from bs4 import BeautifulSoup
 from urllib.parse import urlencode
 from urllib.request import urlopen, Request
 
+import datetime
+
 
 def make_request(url, headers=None, data=None):
     request = Request(url, headers=headers or {}, data=data)
@@ -41,6 +43,8 @@ def retrieveCustomsItemId(fullClassification):
     soup = BeautifulSoup(html, "html.parser")
     # The customItemID of the item (used in the URL, and also in SQL tables)
     items = soup.find_all("li")
+    if len(items) <= 0:
+        return ''   # no item found for this fullClassification
     last = items[-1]
     itemId = last.attrs["id"]
     #print('id=', itemId)
@@ -213,7 +217,7 @@ def extractCustomItemsAsList(df):
 
 def addNumberOfIshurimToDataFrame(df, listOfAllResults):
     print(listOfAllResults)
-    df4 = pd.DataFrame(listOfAllResults, columns = ['Custom_Item', 'itemId', 'numberOfIshurim'])
+    df4 = pd.DataFrame(listOfAllResults, columns = ['Custom_Item', 'itemId', 'numberOfIshurim', 'full_classification_with_additional_digit', 'extracted_at_date'])
     df4 = df4.set_index("Custom_Item")
     print(df4)
 
@@ -223,8 +227,17 @@ def addNumberOfIshurimToDataFrame(df, listOfAllResults):
     return df
 
 
+def checkCorrectness(fullClassWithAdditionalDigit, fullClassification):
+    withoutLastDigit = fullClassWithAdditionalDigit
+    if '/' in withoutLastDigit:
+        index = withoutLastDigit.rfind('/')
+        withoutLastDigit = withoutLastDigit[:index]
+    if withoutLastDigit != fullClassification:
+        print('====> incorrect item full classification:', withoutLastDigit, fullClassification)
+
+
 def main():
-    NUMBER_OF_ITEMS_TO_SCRAPE = 12
+    NUMBER_OF_ITEMS_TO_SCRAPE = 3
     df = readExcelFile("./טבלה מרכזית.xlsx")
     # print(df.tail(4))
     customsItemFullClassificationList = extractCustomItemsAsList(df)
@@ -239,11 +252,13 @@ def main():
     listOfAllResults = []
     for fullClassification in customsItemFullClassificationList[0:NUMBER_OF_ITEMS_TO_SCRAPE]:
         itemId = retrieveCustomsItemId(fullClassification)
-        fullClass, item, uniqueIshurim = scrapeAll(itemId)
-        print(fullClass, item, uniqueIshurim)
-        # tup = scrapeAll(itemId)
-        list1 = [fullClass, item, uniqueIshurim]
-        # print(list1[1], list1[2])
+        if itemId == '':
+            print('====>', fullClassification, 'no data found!')
+            continue    # no data found in CustomsBook web site for this item!
+        fullClassWithAdditionalDigit, item, uniqueIshurim = scrapeAll(itemId)
+        checkCorrectness(fullClassWithAdditionalDigit, fullClassification) # we already have the fullClassification without the additional digit. checking to be sure...
+        currentDate = str(datetime.datetime.now()).split(' ')[0]
+        list1 = [fullClassification, item, uniqueIshurim, fullClassWithAdditionalDigit, currentDate]
         listOfAllResults.append(list1)
 
     # print(listOfAllResults)
@@ -255,4 +270,7 @@ def main():
 
 
 if __name__ == "__main__":
+    startedAt = datetime.datetime.now()
     main()
+    print('started at', startedAt)
+    print('completed at', datetime.datetime.now())
