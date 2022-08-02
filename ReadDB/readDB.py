@@ -38,6 +38,10 @@ def create_db_connection(host_name, user_name, user_password, db_name):
     return connection
 
 
+def connect():
+    return create_db_connection("localhost", "evyatar_user", "123456", "my_db_1")
+
+
 def execute_query(connection, query):
     cursor = connection.cursor()
     try:
@@ -106,6 +110,14 @@ def do_query_to_dataframe(connection, query):
     return df
 
 
+def do_some_queries():
+    connection = connect()
+    if connection is None:
+        exit(-1)
+    retrieve_customs_item_by_full_classification(connection, '4823691000')
+    retrieve_parent_items_of_customs_item(connection, '4823691000')
+
+
 def do_dataframe_query():
     connection = create_db_connection("localhost", "evyatar_user", "123456", "my_db_1")
 
@@ -123,9 +135,28 @@ def do_dataframe_query():
     print(df.to_string())   #to_string() prints the full dataFrame! good for small resultSets
 
 
+def retrieve_customs_item_by_full_classification(connection, item_full_classification):
+    query = "SELECT * FROM CustomsItem where FullClassification='" + item_full_classification + "';"
+    df = do_query_to_dataframe(connection, query)
+    print(query)
+    print(df.to_string())
+    return df
+
+def retrieve_customs_item_by_item_id():
+    pass
+
+
+def retrieve_parent_items_of_customs_item(connection, item_full_classification):
+    query = "SELECT * FROM CustomsItem where FullClassification='" + item_full_classification + "';"
+    df = do_query_to_dataframe(connection, query)
+    print(df["Parent_CustomsItemID"])
+    print(df["CustomsItemHierarchicLocationID"])
+
+
 def main():
     #do_simple_query()
-    do_dataframe_query()
+    #do_dataframe_query()
+    do_some_queries()
 
 
 
