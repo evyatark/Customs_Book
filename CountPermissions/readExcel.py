@@ -16,7 +16,7 @@ from urllib.error import HTTPError, URLError
 import datetime
 
 NAME_OF_RESULTS_FILE = "my_customs_items.xlsx"
-NUMBER_OF_ITEMS_TO_SCRAPE = 500
+NUMBER_OF_ITEMS_TO_SCRAPE = 1000
 
 
 def make_request(url, headers=None, data=None):
@@ -347,15 +347,25 @@ def scrapeAccordingToList(customsItemFullClassificationList, howManyItemsToScrap
 
 def do_some_plotting():
     file_df = readExistingResultsFile()
-    condition_scraped_lines = file_df["numberOfIshurim"].notnull() & file_df["כמות היבואנים עם זיהוי"].notnull()
+    condition_scraped_lines = file_df["numberOfIshurim"].notnull() # & file_df["כמות היבואנים עם זיהוי"].notnull()
     df = file_df[condition_scraped_lines]
     #df["numberOfIshurim"].plot()
     #plt.plot(df.index, df["numberOfIshurim"])
     # Create scatter plot:
     print('number of items:', df.shape[0])
-    plt.scatter(df["numberOfIshurim"], df["כמות היבואנים עם זיהוי"])
+    plt.scatter(df["numberOfIshurim"], df["כמות היבואנים עם זיהוי"]
+                , color='green', marker='o', linestyle='dashed',
+                linewidth=2
+                )
     #plt.scatter(df["כמות היבואנים עם זיהוי"], df["numberOfIshurim"])
+    plt.title( "(םיטירפ " + str(df.shape[0]) + ") " +  "מספר יבואנים ביחס למספר אישורים נדרשים  "[::-1] )   # reverse string because it is in Hebrew
+    #plt.title( "(םיטירפ " + str(df.shape[0]) + ") " +  "מספר אישורים נדרשים ביחס למספר יבואנים"[::-1] )   # reverse string because it is in Hebrew
     plt.show()
+
+
+def just_plot():
+    existingDF = readExistingResultsFile()
+    do_some_plotting()
 
 
 def main():
@@ -364,53 +374,10 @@ def main():
         addToPreviousResults(existingDF)
     else:
         createIfNoPreviousResults()
-    do_some_plotting()
+    #do_some_plotting()
 
 
-def main1():
-    df = None
-    existingDF = readExistingResultsFile()
-    if existingDF is not None:
-        addToPreviousResults(existingDF)
-        customsItemFullClassificationList = extractCustomItemsAsListFromExistingFile(existingDF)
-        df = existingDF
-    else:
-        createIfNoPreviousResults()
-        df = readExcelFile("./טבלה מרכזית.xlsx")
-        customsItemFullClassificationList = extractCustomItemsAsList(df)
 
-    #   NUMBER_OF_ITEMS_TO_SCRAPE = 3
-    howManyItemsToScrape = NUMBER_OF_ITEMS_TO_SCRAPE
-    if len(customsItemFullClassificationList) < NUMBER_OF_ITEMS_TO_SCRAPE:
-        howManyItemsToScrape = customsItemFullClassificationList
-    if howManyItemsToScrape <= 0:
-        print('=====> No items to scrape!', 'All of', NUMBER_OF_ITEMS_TO_SCRAPE, 'were already scraped...') # TODO at date...
-        exit(-1)
-    # list = [3460, 27189]
-
-    # for id in list:
-    #     scrapeAll(id)
-    #     retrieveCustomsItemId("2009129000")
-
-    listOfAllResults = []
-    for fullClassification in customsItemFullClassificationList[0:howManyItemsToScrape]:
-        itemId = retrieveCustomsItemId(fullClassification)
-        if itemId == '':
-            print('====>', fullClassification, 'no data found!')
-            continue    # no data found in CustomsBook web site for this item!
-        fullClassWithAdditionalDigit, item, uniqueIshurim = scrapeAll(itemId)
-        fullClassificationStr = str(fullClassification)
-        checkCorrectness(fullClassWithAdditionalDigit, fullClassificationStr) # we already have the fullClassification without the additional digit. checking to be sure...
-        currentDate = str(datetime.datetime.now()).split(' ')[0]
-        list1 = [fullClassificationStr, item, uniqueIshurim, fullClassWithAdditionalDigit, currentDate]
-        listOfAllResults.append(list1)
-
-    # print(listOfAllResults)
-    # df4 = pd.DataFrame(listOfAllResults, columns = ['Custom_Item', 'itemId', 'numberOfIshurim'])
-    # df4 = df4.set_index("Custom_Item")
-    # print(df4)
-    resulting_df = addNumberOfIshurimToDataFrame(df, listOfAllResults)
-    writeToExcelFile(resulting_df)
 
 
 if __name__ == "__main__":
@@ -418,3 +385,4 @@ if __name__ == "__main__":
     main()
     print('started at', startedAt)
     print('completed at', datetime.datetime.now())
+    #just_plot()
