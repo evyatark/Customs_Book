@@ -27,7 +27,7 @@ pip3 install mysql-connector-python
 pip3 install pandas
 ```
 
-## Creating and populating a a MySQL database
+## Creating and populating a MySQL database
 This is done in a different project! (see ../AccessDB)
 The code in this project assumes that a **populated** MySQL database already exists!
 
@@ -62,7 +62,7 @@ just start a container with
 ```
 docker start /mysql_server_custom_book
 ```
-(later you may use `docker start /mysql_server_custom_book` to stop the container)
+(later you may use `docker stop /mysql_server_custom_book` to stop the container)
 
 3. if a docker image does not exist, you will need to create it (once) with
 ```
@@ -79,7 +79,7 @@ docker works very well on Linux operating systems (such as Ubuntu etc. My person
 
 docker works well on Mac computers (with some minor difficulties).
 
-docker can work on Windows machine, but there may be some issues. It is improving over the years.
+docker can work on Windows machines, but there may be some issues. It is improving over the years.
 
 There are some docker alternatives that may become even more convenient (such as `podman` or even `kubernetes`) in the future.
 
@@ -118,6 +118,14 @@ After editing the file `readDB.py`, run it:
 ```
 python readDB.py
 ```
+
+if your database is not up, you will receive the following error message:
+```
+/home/evyatar/.pyenv/versions/readdb1/bin/python /home/evyatar/Documents/custom/GitHub/Customs_Book/ReadDB/readDB.py 
+==> Error: '2003 (HY000): Can't connect to MySQL server on 'localhost:3306' (111)'
+==> maybe you need to start the database with: docker start mysql_server_custom_book
+```
+(if your database is up and you still receive that error message, then perhaps your script tries to connect to another database - check the URL and credentials in your script)
 
 ## Using Python to read data from a MySQL database
 Here are some links which explain how this could be done:
