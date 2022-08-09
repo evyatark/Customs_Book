@@ -337,7 +337,7 @@ def retrieve_sons(connection, itemId):
 
 
 def retrieve_only_leaves(connection):
-    limit = 17400
+    limit = 400
     count = 0
     query = "SELECT ID FROM CustomsItem where CustomsBookTypeID = 1 and FullClassification not like '-%';"
     results, columns = read_query(connection, query)
@@ -460,7 +460,7 @@ def cache_full_classification_of_all_item_ids(connection):
     list_of_tuples = [(str(x[0]), x[1]) for x in results]
     full_classification_of_item_ids_cache = dict(list_of_tuples)
 
-def retrieve_full_classification_of_item_ids(connection, list_of_item_ids):
+def retrieve_full_classification_of_item_ids1(connection, list_of_item_ids):
     query = "SELECT ID, FullClassification FROM CustomsItem;"
     results, columns = read_query(connection, query)
     #list_of_ids = [str(x[0]) for x in results if str(x[0]) in list_of_item_ids]  # a generator that iterates over all tuples, from each tuple takes the first value
@@ -568,6 +568,18 @@ def retrieve_regularity_inception(connection, req):
     return inceptions
 
 
+def safe_authority_id(authority_id):
+    if authority_id in AuthorityID_table.keys():
+        return authority_id + "-" + AuthorityID_table[authority_id]
+    return authority_id
+
+
+def safe_conf_type(conf_type):
+    if conf_type in ConfirmationTypeID_table.keys():
+        return conf_type + "-" + ConfirmationTypeID_table[conf_type]
+    return conf_type
+
+
 def retrieve_regularity_requirement(connection, item_id):
     """
     This method retrieves from SQL db, **for a single item-id** the data that is displayed in the part of Regulatory Requirements.
@@ -633,11 +645,11 @@ def retrieve_regularity_requirement(connection, item_id):
         d['description'] = str(row[27])
         d['RegularityRequiredCertificateID'] = str(row[30])
         # ConfirmationTypeID (together with AuthorityID?): see ConfirmationTypeID_table and comments at beginning of file
-        d['ConfirmationTypeID'] = str(row[32]) + '-' + ConfirmationTypeID_table[str(row[32])]      # סוג אישור
+        d['ConfirmationTypeID'] = safe_conf_type(str(row[32]))     # סוג אישור
         d['CNumber'] = str(row[33])
         d['TextualCondition'] = str(row[34])    # תיאור תנאים
         d['TrNumber'] = str(row[35])    # תיאור תנאים
-        d['AuthorityID'] = str(row[36]) + '-' + AuthorityID_table[str(row[36])] # see AuthorityID_table and comments at beginning of file
+        d['AuthorityID'] = safe_authority_id(str(row[36])) # see AuthorityID_table and comments at beginning of file
         # append only lines in which current date is between d['start_date'] and d['end_date'] = only_date(row[16])
         #reqs.append(d)
         if current_date>d['start_date'] and current_date<d['end_date']:
@@ -691,9 +703,9 @@ def retrieve_for_all_parents(connection, item_id):
         all_reqs.append(reqs)
     # now flatten the list of lists
     flattened_list = list(chain.from_iterable(all_reqs))
-    #print('===============')
-    #print(zipped)
-    #print_flattened_list(flattened_list)
+    print('===============')
+    print(zipped)
+    print_flattened_list(flattened_list)
     return flattened_list
 
 def unknown_confirmation_type():
@@ -714,6 +726,26 @@ def find_all_confirmation_ids(connection):
         all_ids.add(row[1])
     print(sorted(all_ids))
 
+def searchConfirmationTypeIDs(connection):
+    find_all_confirmation_ids(connection)
+    unknown_conf_ids = unknown_confirmation_type()
+    list_of_leave_ids = retrieve_only_leaves(connection)
+    set_found_conf_ids = set()
+    counter = 0
+    print("searching all", len(list_of_leave_ids), "leaf items...")
+    for item in list_of_leave_ids:
+        counter = counter + 1
+        if counter % 100 == 0:
+            print(counter)
+        list_of_regulations = retrieve_for_all_parents(connection, item)
+        for reg in list_of_regulations:
+            conf_id = reg['ConfirmationTypeID']
+            if conf_id in unknown_conf_ids:
+                set_found_conf_ids.add(conf_id)
+                print(item)
+                print(reg)
+        # print(list_of_regulations[0])
+
 
 def do_some_queries():
     connection = connect()
@@ -729,26 +761,12 @@ def do_some_queries():
     #retrieve_all_import_Full_Classifications_as_sorted_list(connection)
     #list_of_parents = retrieve_all_parents_of_item(connection, '16')
     #print(list_of_parents)
-    find_all_confirmation_ids(connection)
-    unknown_conf_ids = unknown_confirmation_type()
-    list_of_leave_ids = retrieve_only_leaves(connection)
+    #list_of_leave_ids = retrieve_only_leaves(connection)
     #list_of_leave_ids.insert(0, '25783')
     # retrieve_full_classification_of_item_ids(connection, list_of_ids)
-    set_found_conf_ids = set()
-    counter = 0
-    print("searching all", len(list_of_leave_ids), "leaf items...")
-    for item in list_of_leave_ids:
-        counter = counter + 1
-        if counter%100==0:
-            print(counter)
-        list_of_regulations = retrieve_for_all_parents(connection, item)
-        for reg in list_of_regulations:
-            conf_id = reg['ConfirmationTypeID']
-            if conf_id in unknown_conf_ids:
-                set_found_conf_ids.add(conf_id)
-                print(item)
-                print(reg)
-        #print(list_of_regulations[0])
+    list_of_ids = retrieve_only_leaves(connection)
+    for item in list_of_ids:
+        retrieve_for_all_parents(connection, item)
 
 
 def main():
@@ -767,64 +785,3 @@ if __name__ == "__main__":
     print('completed at', datetime.datetime.now())
 
 
-
-# for item_id=4 (full_classification=0407110000) I got:
-# [
-#     {'order': 0, 'RegularityRequirementID': '3962', 'from_item': '26074', 'create_date': '2011-06-01', 'update_date': '1970-01-01', 'start_date': '2011-06-01', 'end_date': '2069-12-31', 'InceptionCodeID': '1', 'RegularityPublicationCodeID': '1', 'RegularityInceptionID': '3499', 'InterConditions': '1-All', 'personal': '1-Yes', 'description': ' ', 'RegularityRequiredCertificateID': '1818', 'ConfirmationTypeID': '1', 'CNumber': '0', 'TextualCondition': '', 'TrNumber': '0', 'AuthorityID': '1'},
-#     {'order': 1, 'RegularityRequirementID': '5934', 'from_item': '26074', 'create_date': '2020-03-25', 'update_date': '1970-01-01', 'start_date': '2011-06-01', 'end_date': '2069-12-31', 'InceptionCodeID': '1', 'RegularityPublicationCodeID': '20', 'RegularityInceptionID': '7108', 'InterConditions': '1-All', 'personal': '1-Yes', 'description': ' ', 'RegularityRequiredCertificateID': '10310', 'ConfirmationTypeID': '1', 'CNumber': '0', 'TextualCondition': '', 'TrNumber': '0', 'AuthorityID': '1'},
-#     {'order': 3, 'RegularityRequirementID': '4357', 'from_item': '20729', 'create_date': '2011-06-01', 'update_date': '1970-01-01', 'start_date': '2011-06-01', 'end_date': '2069-12-31', 'InceptionCodeID': '2', 'RegularityPublicationCodeID': '1', 'RegularityInceptionID': '1549', 'InterConditions': '1-All', 'personal': '1-Yes', 'description': 'חלב ומוצרי חלב להזנת בעלי חיים', 'RegularityRequiredCertificateID': '1815', 'ConfirmationTypeID': '1', 'CNumber': '0', 'TextualCondition': '', 'TrNumber': '0', 'AuthorityID': '1'},
-#     {'order': 4, 'RegularityRequirementID': '4357', 'from_item': '20729', 'create_date': '2011-06-01', 'update_date': '1970-01-01', 'start_date': '2011-06-01', 'end_date': '2069-12-31', 'InceptionCodeID': '2', 'RegularityPublicationCodeID': '1', 'RegularityInceptionID': '1548', 'InterConditions': '1-All', 'personal': '0', 'description': 'אחרים למעט 04.07 ו-04.08', 'RegularityRequiredCertificateID': '1816', 'ConfirmationTypeID': '66', 'CNumber': '0', 'TextualCondition': '', 'TrNumber': '0', 'AuthorityID': '7'},
-#     {'order': 5, 'RegularityRequirementID': '4357', 'from_item': '20729', 'create_date': '2011-06-01', 'update_date': '1970-01-01', 'start_date': '2011-06-01', 'end_date': '2069-12-31', 'InceptionCodeID': '2', 'RegularityPublicationCodeID': '1', 'RegularityInceptionID': '1548', 'InterConditions': '1-All', 'personal': '0', 'description': 'אחרים למעט 04.07 ו-04.08', 'RegularityRequiredCertificateID': '1817', 'ConfirmationTypeID': '70', 'CNumber': '0', 'TextualCondition': '', 'TrNumber': '0', 'AuthorityID': '7'},
-#     {'order': 7, 'RegularityRequirementID': '6190', 'from_item': '20729', 'create_date': '2020-03-25', 'update_date': '1970-01-01', 'start_date': '2011-06-01', 'end_date': '2069-12-31', 'InceptionCodeID': '2', 'RegularityPublicationCodeID': '20', 'RegularityInceptionID': '6072', 'InterConditions': '3-Alt', 'personal': '1-Yes', 'description': 'חלב ומוצרי חלב להזנת בעלי חיים', 'RegularityRequiredCertificateID': '10309', 'ConfirmationTypeID': '1', 'CNumber': '0', 'TextualCondition': '', 'TrNumber': '0', 'AuthorityID': '1'}
-# ]
-
-# for item_id=7 (full_classification=0701109100) I got:
-# (7, '0701109100'), list of parents is ['7', '16156', '5642', '23464', '6118', '11984']
-# [
-#     {'order': 0, 'RegularityRequirementID': '3349', 'from_item': '23464', 'create_date': '2008-06-04', 'update_date': '1970-01-01', 'start_date': '2008-06-04', 'end_date': '2069-12-31', 'InceptionCodeID': '2', 'RegularityPublicationCodeID': '1', 'RegularityInceptionID': '1795', 'InterConditions': '1-All', 'personal': '1-Yes', 'description': 'לזריעה', 'RegularityRequiredCertificateID': '1840', 'ConfirmationTypeID': '2', 'CNumber': '0', 'TextualCondition': '', 'TrNumber': '0', 'AuthorityID': '1'},
-#     {'order': 1, 'RegularityRequirementID': '3349', 'from_item': '23464', 'create_date': '2008-06-04', 'update_date': '1970-01-01', 'start_date': '2008-06-04', 'end_date': '2069-12-31', 'InceptionCodeID': '2', 'RegularityPublicationCodeID': '1', 'RegularityInceptionID': '1794', 'InterConditions': '1-All', 'personal': '0', 'description': 'אחרים', 'RegularityRequiredCertificateID': '1841', 'ConfirmationTypeID': '66', 'CNumber': '0', 'TextualCondition': '', 'TrNumber': '0', 'AuthorityID': '7'},
-#     {'order': 2, 'RegularityRequirementID': '3349', 'from_item': '23464', 'create_date': '2008-06-04', 'update_date': '1970-01-01', 'start_date': '2008-06-04', 'end_date': '2069-12-31', 'InceptionCodeID': '2', 'RegularityPublicationCodeID': '1', 'RegularityInceptionID': '1794', 'InterConditions': '1-All', 'personal': '0', 'description': 'אחרים', 'RegularityRequiredCertificateID': '1842', 'ConfirmationTypeID': '2', 'CNumber': '0', 'TextualCondition': '', 'TrNumber': '0', 'AuthorityID': '1'},
-#     {'order': 3, 'RegularityRequirementID': '3349', 'from_item': '23464', 'create_date': '2008-06-04', 'update_date': '1970-01-01', 'start_date': '2008-06-04', 'end_date': '2069-12-31', 'InceptionCodeID': '2', 'RegularityPublicationCodeID': '1', 'RegularityInceptionID': '1794', 'InterConditions': '1-All', 'personal': '0', 'description': 'אחרים', 'RegularityRequiredCertificateID': '1843', 'ConfirmationTypeID': '70', 'CNumber': '0', 'TextualCondition': '', 'TrNumber': '0', 'AuthorityID': '7'},
-#     {'order': 4, 'RegularityRequirementID': '5646', 'from_item': '23464', 'create_date': '2020-03-25', 'update_date': '1970-01-01', 'start_date': '2008-06-04', 'end_date': '2069-12-31', 'InceptionCodeID': '2', 'RegularityPublicationCodeID': '20', 'RegularityInceptionID': '6230', 'InterConditions': '1-All', 'personal': '1-Yes', 'description': 'לזריעה', 'RegularityRequiredCertificateID': '10326', 'ConfirmationTypeID': '2', 'CNumber': '0', 'TextualCondition': '', 'TrNumber': '0', 'AuthorityID': '1'},
-#     {'order': 5, 'RegularityRequirementID': '5646', 'from_item': '23464', 'create_date': '2020-03-25', 'update_date': '1970-01-01', 'start_date': '2008-06-04', 'end_date': '2069-12-31', 'InceptionCodeID': '2', 'RegularityPublicationCodeID': '20', 'RegularityInceptionID': '8278', 'InterConditions': '1-All', 'personal': '1-Yes', 'description': 'אחרים', 'RegularityRequiredCertificateID': '10732', 'ConfirmationTypeID': '2', 'CNumber': '0', 'TextualCondition': ' ', 'TrNumber': '0', 'AuthorityID': '1'}
-# ]
-
-# (9, '0712391000'), list of parents is ['9', '21870', '8925', '2069', '6118', '11984']
-# [
-#     {'order': 7, 'RegularityRequirementID': '1671', 'from_item': '2069', 'create_date': '2016-04-14', 'update_date': '1970-01-01', 'start_date': '2016-04-14', 'end_date': '2069-12-31', 'InceptionCodeID': '2', 'RegularityPublicationCodeID': '1', 'RegularityInceptionID': '3676', 'InterConditions': '1-All', 'personal': '1-Yes', 'description': 'לזריעה', 'RegularityRequiredCertificateID': '7113', 'ConfirmationTypeID': '2', 'CNumber': '0', 'TextualCondition': '', 'TrNumber': '0', 'AuthorityID': '1'},
-#     {'order': 8, 'RegularityRequirementID': '1671', 'from_item': '2069', 'create_date': '2016-04-14', 'update_date': '1970-01-01', 'start_date': '2016-04-14', 'end_date': '2069-12-31', 'InceptionCodeID': '2', 'RegularityPublicationCodeID': '1', 'RegularityInceptionID': '3677', 'InterConditions': '1-All', 'personal': '0', 'description': 'חתוכים, פרוסים, שבורים, בצרת אבקה', 'RegularityRequiredCertificateID': '7114', 'ConfirmationTypeID': '66', 'CNumber': '0', 'TextualCondition': '', 'TrNumber': '0', 'AuthorityID': '7'},
-#     {'order': 9, 'RegularityRequirementID': '1671', 'from_item': '2069', 'create_date': '2016-04-14', 'update_date': '1970-01-01', 'start_date': '2016-04-14', 'end_date': '2069-12-31', 'InceptionCodeID': '2', 'RegularityPublicationCodeID': '1', 'RegularityInceptionID': '3677', 'InterConditions': '1-All', 'personal': '0', 'description': 'חתוכים, פרוסים, שבורים, בצרת אבקה', 'RegularityRequiredCertificateID': '7115', 'ConfirmationTypeID': '70', 'CNumber': '0', 'TextualCondition': '', 'TrNumber': '0', 'AuthorityID': '7'},
-#     {'order': 10, 'RegularityRequirementID': '1671', 'from_item': '2069', 'create_date': '2016-04-14', 'update_date': '1970-01-01', 'start_date': '2016-04-14', 'end_date': '2069-12-31', 'InceptionCodeID': '2', 'RegularityPublicationCodeID': '1', 'RegularityInceptionID': '3675', 'InterConditions': '1-All', 'personal': '0', 'description': 'אחרים', 'RegularityRequiredCertificateID': '7117', 'ConfirmationTypeID': '70', 'CNumber': '0', 'TextualCondition': '', 'TrNumber': '0', 'AuthorityID': '7'},
-#     {'order': 11, 'RegularityRequirementID': '1671', 'from_item': '2069', 'create_date': '2016-04-14', 'update_date': '1970-01-01', 'start_date': '2016-04-14', 'end_date': '2069-12-31', 'InceptionCodeID': '2', 'RegularityPublicationCodeID': '1', 'RegularityInceptionID': '3675', 'InterConditions': '1-All', 'personal': '0', 'description': 'אחרים', 'RegularityRequiredCertificateID': '9990', 'ConfirmationTypeID': '66', 'CNumber': '0', 'TextualCondition': ' ', 'TrNumber': '0', 'AuthorityID': '7'},
-#     {'order': 16, 'RegularityRequirementID': '4670', 'from_item': '2069', 'create_date': '2020-03-25', 'update_date': '1970-01-01', 'start_date': '2016-04-14', 'end_date': '2069-12-31', 'InceptionCodeID': '2', 'RegularityPublicationCodeID': '20', 'RegularityInceptionID': '7218', 'InterConditions': '1-All', 'personal': '1-Yes', 'description': 'לזריעה', 'RegularityRequiredCertificateID': '10631', 'ConfirmationTypeID': '2', 'CNumber': '0', 'TextualCondition': '', 'TrNumber': '0', 'AuthorityID': '1'},
-#     {'order': 17, 'RegularityRequirementID': '4670', 'from_item': '2069', 'create_date': '2020-03-25', 'update_date': '1970-01-01', 'start_date': '2016-04-14', 'end_date': '2069-12-31', 'InceptionCodeID': '2', 'RegularityPublicationCodeID': '20', 'RegularityInceptionID': '8288', 'InterConditions': '1-All', 'personal': '1-Yes', 'description': 'אחרים', 'RegularityRequiredCertificateID': '10737', 'ConfirmationTypeID': '2', 'CNumber': '0', 'TextualCondition': ' ', 'TrNumber': '0', 'AuthorityID': '1'},
-#     {'order': 21, 'RegularityRequirementID': '1671', 'from_item': '2069', 'create_date': '2016-04-14', 'update_date': '1970-01-01', 'start_date': '2016-04-14', 'end_date': '2069-12-31', 'InceptionCodeID': '2', 'RegularityPublicationCodeID': '1', 'RegularityInceptionID': '3675', 'InterConditions': '1-All', 'personal': '0', 'description': 'אחרים', 'RegularityRequiredCertificateID': '13139', 'ConfirmationTypeID': '2', 'CNumber': '0', 'TextualCondition': ' ', 'TrNumber': '0', 'AuthorityID': '1'}
-# ]
-#
-# (12, '1701130000')
-# list of parents is ['12', '2186', '14619', '11448', '16904']
-#
-# [
-#     {'order': 2, 'RegularityRequirementID': '3546', 'from_item': '11448', 'create_date': '2009-05-10', 'update_date': '1970-01-01', 'start_date': '2009-05-10', 'end_date': '2069-12-31', 'InceptionCodeID': '2', 'RegularityPublicationCodeID': '1', 'RegularityInceptionID': '5023', 'InterConditions': '1-All', 'personal': '0', 'description': 'למאכל אדם', 'RegularityRequiredCertificateID': '2118', 'ConfirmationTypeID': '66', 'CNumber': '0', 'TextualCondition': '', 'TrNumber': '0', 'AuthorityID': '7'},
-#     {'order': 3, 'RegularityRequirementID': '3546', 'from_item': '11448', 'create_date': '2009-05-10', 'update_date': '1970-01-01', 'start_date': '2009-05-10', 'end_date': '2069-12-31', 'InceptionCodeID': '2', 'RegularityPublicationCodeID': '1', 'RegularityInceptionID': '5023', 'InterConditions': '1-All', 'personal': '0', 'description': 'למאכל אדם', 'RegularityRequiredCertificateID': '2119', 'ConfirmationTypeID': '70', 'CNumber': '0', 'TextualCondition': '', 'TrNumber': '0', 'AuthorityID': '7'},
-#     {'order': 4, 'RegularityRequirementID': '3546', 'from_item': '11448', 'create_date': '2009-05-10', 'update_date': '1970-01-01', 'start_date': '2009-05-10', 'end_date': '2069-12-31', 'InceptionCodeID': '2', 'RegularityPublicationCodeID': '1', 'RegularityInceptionID': '5024', 'InterConditions': '1-All', 'personal': '0', 'description': 'המיועד לייצור תרופות', 'RegularityRequiredCertificateID': '2120', 'ConfirmationTypeID': '67', 'CNumber': '0', 'TextualCondition': '', 'TrNumber': '0', 'AuthorityID': '7'}
-# ]
-
-# ===============
-# in following case, web-site united 13+14, 16+19, 17+18 ! why? same AuthorityID, same ConfirmationID, InterConditions=3(Alternate). It appended TrNumber and TextualCondirion (with '/')
-# [('25783', '8517629000'), ('23655', '8517620000'), ('14701', '8517600000'), ('10352', '8517000000'), ('8901', '8500000000'), ('16194', 'XVI')]
-# {'order': 4, 'RegularityRequirementID': '2671', 'from_item': '14701', 'from_item_fc': '8517600000', 'create_date': '2017-05-01', 'update_date': '1970-01-01', 'start_date': '2017-05-01', 'end_date': '2069-12-31', 'InceptionCodeID': '2', 'RegularityPublicationCodeID': '1', 'RegularityInceptionID': '3290', 'InterConditions': '1-All', 'personal': '1-Yes', 'description': 'מתאם תקשורת לרשת החשמל (ציוד המעביר מידע על קווי רשת החשמל) יחול בייבוא אישי ומסחרי למעט ציוד שבו פועלת טכנולוגיית blue tooth ולמעט שעון יד אלחוטי', 'RegularityRequiredCertificateID': '7630', 'ConfirmationTypeID': '91', 'CNumber': '0', 'TextualCondition': '', 'TrNumber': '0', 'AuthorityID': '13'}
-# {'order': 7, 'RegularityRequirementID': '5236', 'from_item': '14701', 'from_item_fc': '8517600000', 'create_date': '2020-03-25', 'update_date': '1970-01-01', 'start_date': '2017-05-01', 'end_date': '2069-12-31', 'InceptionCodeID': '2', 'RegularityPublicationCodeID': '20', 'RegularityInceptionID': '7006', 'InterConditions': '1-All', 'personal': '1-Yes', 'description': 'מתאם תקשורת לרשת (ציוד המעביר מידע על קווי רשת החשמל) למעט ציוד טכנולוגי מסוג BLUE TOOTH, שעון יד חכם, נתב (ראוטר) לשימוש תוך-ביתי, נקודת גישה לשימוש תוך-ביתי ומגדיל טווח בטכנולוגיית WIFI לשימוש תוך-ביתי', 'RegularityRequiredCertificateID': '11903', 'ConfirmationTypeID': '91', 'CNumber': '0', 'TextualCondition': '', 'TrNumber': '0', 'AuthorityID': '13'}
-# {'order': 12, 'RegularityRequirementID': '2716', 'from_item': '10352', 'from_item_fc': '8517000000', 'create_date': '2014-01-20', 'update_date': '1970-01-01', 'start_date': '2014-01-20', 'end_date': '2069-12-31', 'InceptionCodeID': '2', 'RegularityPublicationCodeID': '1', 'RegularityInceptionID': '4023', 'InterConditions': '1-All', 'personal': '1-Yes', 'description': 'למעט ציוד אופטי וציוד לרשת תקשורת מקומית קווית שאינו מיועד להתחבר לרשת בזק ציבורית ולמעט פרט המכס 85.17.7000 ולמעט טכנולוגיית ANT+ /ANT , חלקי חילוף לציוד קצה וציוד המסומן בסימון CE ', 'RegularityRequiredCertificateID': '6761', 'ConfirmationTypeID': '91', 'CNumber': '0', 'TextualCondition': '', 'TrNumber': '0', 'AuthorityID': '13'}
-# {'order': 13, 'RegularityRequirementID': '2716', 'from_item': '10352', 'from_item_fc': '8517000000', 'create_date': '2014-01-20', 'update_date': '1970-01-01', 'start_date': '2014-01-20', 'end_date': '2069-12-31', 'InceptionCodeID': '2', 'RegularityPublicationCodeID': '1', 'RegularityInceptionID': '4022', 'InterConditions': '3-Alt', 'personal': '0-No', 'description': 'מוזנות ממתח נקוב העולה על 9 וולט או מוזנות ממתח נקוב שאינו עולה על 9 וולט, אך מיובאות עם ספק כוח', 'RegularityRequiredCertificateID': '6762', 'ConfirmationTypeID': '53', 'CNumber': '0', 'TextualCondition': '60950', 'TrNumber': '60950', 'AuthorityID': '4'}
-# {'order': 14, 'RegularityRequirementID': '2716', 'from_item': '10352', 'from_item_fc': '8517000000', 'create_date': '2014-01-20', 'update_date': '1970-01-01', 'start_date': '2014-01-20', 'end_date': '2069-12-31', 'InceptionCodeID': '2', 'RegularityPublicationCodeID': '1', 'RegularityInceptionID': '4022', 'InterConditions': '3-Alt', 'personal': '0-No', 'description': 'מוזנות ממתח נקוב העולה על 9 וולט או מוזנות ממתח נקוב שאינו עולה על 9 וולט, אך מיובאות עם ספק כוח', 'RegularityRequiredCertificateID': '6763', 'ConfirmationTypeID': '53', 'CNumber': '0', 'TextualCondition': '', 'TrNumber': '60065', 'AuthorityID': '4'}
-# {'order': 15, 'RegularityRequirementID': '2711', 'from_item': '10352', 'from_item_fc': '8517000000', 'create_date': '2016-06-15', 'update_date': '1970-01-01', 'start_date': '2016-06-15', 'end_date': '2069-12-31', 'InceptionCodeID': '2', 'RegularityPublicationCodeID': '16', 'RegularityInceptionID': '3932', 'InterConditions': '1-All', 'personal': '1-Yes', 'description': 'מכשירי טלפון, כולל טלפונים לרשתות תאיות או לרשתות אלחוטיות, מכשירים אחרים לשידור וקליטה של קול, תמונות או נתונים אחרים, כולל מכשירי תקשורת ברשתות קוויות או אלחוטיות מקומיות (LAN) או אזוריות (WAN)\n', 'RegularityRequiredCertificateID': '7353', 'ConfirmationTypeID': '123', 'CNumber': '0', 'TextualCondition': '', 'TrNumber': '0', 'AuthorityID': '23'}
-# {'order': 16, 'RegularityRequirementID': '2716', 'from_item': '10352', 'from_item_fc': '8517000000', 'create_date': '2014-01-20', 'update_date': '1970-01-01', 'start_date': '2014-01-20', 'end_date': '2069-12-31', 'InceptionCodeID': '2', 'RegularityPublicationCodeID': '1', 'RegularityInceptionID': '4022', 'InterConditions': '3-Alt', 'personal': '0-No', 'description': 'מוזנות ממתח נקוב העולה על 9 וולט או מוזנות ממתח נקוב שאינו עולה על 9 וולט, אך מיובאות עם ספק כוח', 'RegularityRequiredCertificateID': '7983', 'ConfirmationTypeID': '522', 'CNumber': '0', 'TextualCondition': ' ', 'TrNumber': '60065', 'AuthorityID': '24'}
-# {'order': 17, 'RegularityRequirementID': '2716', 'from_item': '10352', 'from_item_fc': '8517000000', 'create_date': '2014-01-20', 'update_date': '1970-01-01', 'start_date': '2014-01-20', 'end_date': '2069-12-31', 'InceptionCodeID': '2', 'RegularityPublicationCodeID': '1', 'RegularityInceptionID': '4022', 'InterConditions': '3-Alt', 'personal': '0-No', 'description': 'מוזנות ממתח נקוב העולה על 9 וולט או מוזנות ממתח נקוב שאינו עולה על 9 וולט, אך מיובאות עם ספק כוח', 'RegularityRequiredCertificateID': '8670', 'ConfirmationTypeID': '109', 'CNumber': '0', 'TextualCondition': '', 'TrNumber': '60065', 'AuthorityID': '3'}
-# {'order': 18, 'RegularityRequirementID': '2716', 'from_item': '10352', 'from_item_fc': '8517000000', 'create_date': '2014-01-20', 'update_date': '1970-01-01', 'start_date': '2014-01-20', 'end_date': '2069-12-31', 'InceptionCodeID': '2', 'RegularityPublicationCodeID': '1', 'RegularityInceptionID': '4022', 'InterConditions': '3-Alt', 'personal': '0-No', 'description': 'מוזנות ממתח נקוב העולה על 9 וולט או מוזנות ממתח נקוב שאינו עולה על 9 וולט, אך מיובאות עם ספק כוח', 'RegularityRequiredCertificateID': '8671', 'ConfirmationTypeID': '109', 'CNumber': '0', 'TextualCondition': '60950', 'TrNumber': '60950', 'AuthorityID': '3'}
-# {'order': 19, 'RegularityRequirementID': '2716', 'from_item': '10352', 'from_item_fc': '8517000000', 'create_date': '2014-01-20', 'update_date': '1970-01-01', 'start_date': '2014-01-20', 'end_date': '2069-12-31', 'InceptionCodeID': '2', 'RegularityPublicationCodeID': '1', 'RegularityInceptionID': '4022', 'InterConditions': '3-Alt', 'personal': '0-No', 'description': 'מוזנות ממתח נקוב העולה על 9 וולט או מוזנות ממתח נקוב שאינו עולה על 9 וולט, אך מיובאות עם ספק כוח', 'RegularityRequiredCertificateID': '9549', 'ConfirmationTypeID': '522', 'CNumber': '0', 'TextualCondition': '60950', 'TrNumber': '60950', 'AuthorityID': '24'}
-# {'order': 24, 'RegularityRequirementID': '5268', 'from_item': '10352', 'from_item_fc': '8517000000', 'create_date': '2020-03-25', 'update_date': '1970-01-01', 'start_date': '2014-01-20', 'end_date': '2069-12-31', 'InceptionCodeID': '2', 'RegularityPublicationCodeID': '20', 'RegularityInceptionID': '7484', 'InterConditions': '3-Alt', 'personal': '1-Yes', 'description': 'למעט ציוד אופטי וציוד לרשת תקשורת מקומית קווית שאינו מיועד להתחבר לרשת בזק ציבורית, ולמעט פרט המכס 85.17.6000 ו-85.17.7000 ולמעט טלפון נייד וחלקיו', 'RegularityRequiredCertificateID': '11913', 'ConfirmationTypeID': '91', 'CNumber': '0', 'TextualCondition': '', 'TrNumber': '0', 'AuthorityID': '13'}
-# {'order': 1, 'RegularityRequirementID': '3740', 'from_item': '8901', 'from_item_fc': '8500000000', 'create_date': '2015-10-27', 'update_date': '1970-01-01', 'start_date': '2015-10-27', 'end_date': '2069-12-31', 'InceptionCodeID': '2', 'RegularityPublicationCodeID': '1', 'RegularityInceptionID': '4039', 'InterConditions': '1-All', 'personal': '1-Yes', 'description': 'טובין המותקנים על גרורים (Trailers), גרורים נתמכים (Semi – trailers), הנגררים על ידי כלי רכב, לפי נוהלי אגף הרכב', 'RegularityRequiredCertificateID': '7083', 'ConfirmationTypeID': '516', 'CNumber': '0', 'TextualCondition': '', 'TrNumber': '0', 'AuthorityID': '2'}
-# {'order': 2, 'RegularityRequirementID': '3740', 'from_item': '8901', 'from_item_fc': '8500000000', 'create_date': '2015-10-27', 'update_date': '1970-01-01', 'start_date': '2015-10-27', 'end_date': '2069-12-31', 'InceptionCodeID': '2', 'RegularityPublicationCodeID': '1', 'RegularityInceptionID': '4040', 'InterConditions': '1-All', 'personal': '1-Yes', 'description': 'נגררים שתוכננו ויוצרו בידי היצרן לשימושים חקלאיים', 'RegularityRequiredCertificateID': '7084', 'ConfirmationTypeID': '4', 'CNumber': '0', 'TextualCondition': '', 'TrNumber': '0', 'AuthorityID': '1'}
-# {'order': 3, 'RegularityRequirementID': '5822', 'from_item': '8901', 'from_item_fc': '8500000000', 'create_date': '2020-03-25', 'update_date': '1970-01-01', 'start_date': '2015-10-27', 'end_date': '2069-12-31', 'InceptionCodeID': '2', 'RegularityPublicationCodeID': '20', 'RegularityInceptionID': '7490', 'InterConditions': '3-Alt', 'personal': '1-Yes', 'description': 'לשימושים חקלאיים', 'RegularityRequiredCertificateID': '10627', 'ConfirmationTypeID': '4', 'CNumber': '0', 'TextualCondition': '', 'TrNumber': '0', 'AuthorityID': '1'}
-# {'order': 4, 'RegularityRequirementID': '5822', 'from_item': '8901', 'from_item_fc': '8500000000', 'create_date': '2020-03-25', 'update_date': '1970-01-01', 'start_date': '2015-10-27', 'end_date': '2069-12-31', 'InceptionCodeID': '2', 'RegularityPublicationCodeID': '20', 'RegularityInceptionID': '7488', 'InterConditions': '3-Alt', 'personal': '1-Yes', 'description': 'טובין המותקנים על גרורים (Trailers), גרורים נתמכים (Semi – trailers), הנגררים על ידי כלי רכב נגררים שתוכננו ויוצרו בידי היצרן', 'RegularityRequiredCertificateID': '10832', 'ConfirmationTypeID': '516', 'CNumber': '0', 'TextualCondition': '', 'TrNumber': '0', 'AuthorityID': '2'}
