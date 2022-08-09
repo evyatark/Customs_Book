@@ -6,6 +6,196 @@ import pandas as pd
 import datetime
 from itertools import chain
 
+
+full_classification_of_item_ids_cache = dict()
+parents_of_items_cache = dict()
+
+known_confirmation_id=(        # ConfirmationTypeID (together with AuthorityID?):
+        1, 2, 3, 4, 5, 7, 9, 10, 16, 18,
+    19, 22, 24, 25, 26, 27, 28, 29, 31, 32, 33, 34, 36, 37, 39, 40, 41, 42, 43, 44, 47,
+    53, 54, 58, 60, 61, 62, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 78, 80, 82,
+    87, 89, 91, 96, 98, 101, 103, 106, 109, 113, 118, 123, 515, 516, 517, 519, 520, 522, 524, 526, 527, 532
+        )
+all_conf_ids = [1, 2, 3, 4, 5, 6, 7, 9, 10, 13, 14, 15, 16, 18, 19, 20, 21, 22, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 36, 37, 39, 40, 41, 42, 43, 44, 47, 49, 50, 51, 52, 53, 54, 58, 60, 61, 62, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 80, 82, 84, 86, 87, 89, 91, 96, 98, 99, 101, 103, 105, 106, 108, 109, 113, 116, 118, 120, 121, 123, 505, 515, 516, 517, 518, 519, 520, 521, 522, 524, 526, 527, 528, 532]
+
+
+# 1=0101(Vetrinary), 2=0102(HaganatHazomeach), 3=0103(Ishur Tiv Mispo), 4=0104(Ishur Mikun VeTechnologia)
+# 7=0107 (Ishur Mancal Chaklaut)
+# 5=0105 6= 9=0109 10=0110 13= 14= 15=
+# 16= aaa אישור יצוא שירותים להגנת הצומח (without code!!) (Misrad HaChaklaut)
+# 18=0201, 19=0204 (Maabada Musmechet LeRechev)
+# 20= 21=
+# 22=0207 (Ishur Mankal Tachbura)
+# 24=0209 (Vaada Bein Misradit LeHetkenei Tnuah VeBetichut)
+# 25=0210 26=0212 27=0213 28=0214
+# 29=0215 (Rishayon Otonomia)  30=, 31=0217, 32=0218,
+# 33= aaa רשיון יצוא אגף הרכב ושירותי תחזוקה - צמ"ה (without code!!)
+# 34=0202 (Rishayon Agaf Rechev... Gaf Zamah)
+# 36=0302 (Ishur Midot VeMishkalot) 37=0303
+# 39=0305, 40=0307, 41=0308, 42=0309. 43=0310, 44=0311
+# 47=0315 49= 50= 51= 52=
+# 53=0402 (Machon HaTkanim Ishur LeShichrur)
+# 54=Ishur Mafmac "" "אישור מפמכ"  (without code!!!)
+# 58=0501 aaa "רשות המיסים אישור מנהל"
+# 60=0602
+# 61=0603 (Ishur Memune Al HaKrina)
+# 62=0604 64= 65=
+# 66=0701 67=0702 68=0703 69=0704 70=0705 71=0706 72=0708 73=0709 (Ishur Mancal Briut) 74=0710
+# 75= aaa רשיון יבוא מלשכת הבריאות בנפת רמלה (without code!!)
+# 76 77
+# 78=0802 (Misrad HaBitachon)
+# 80= aaa אישור הועדה לאנרגיה אטומית (without code!!)
+# 82=1001 aaa אישור אגף ניהול משאבי תשתיות במשרד האנרגיה
+# 84 86
+# 87=1101 (Teudat Hechsher)
+# 89=1201 aaa אישור בטחון פנים
+# 91=1301 (IshurTikshoretSpectrum)
+# 96= (Misrad HaTarbut VeHaSport?) אישור מנכל המדע התרבות והספורט (without code!!)
+# 98= (Misrad HaChinuch?) אישור מנכל חינוך (without code!!)
+# 99
+# 101 aaa אישור מנכל בינוי ושיכון (without code!!) (Misrad HaShikun)
+# 103= aaa רשיון יבוא (without code!!) AuthorityID=19
+# 105
+# 106=2101 aaa אישור רשות העתיקות
+# 108
+# 109=0325 (Ishur Sichrur)
+# 113=1203(Rishayon Agaf Pikuach VeRishuy Klei Yeriyah)
+# 116
+# 118=0713
+# 120 121
+# 123=2301 (HaMinhal HaEzrachi Ishur Kamat Tikshoret)
+# 505 515=0804(Rishayon LeYevu Amlach)
+# 516=0219 (Ishur Agaf Harechev ... Gaf Zamah)
+# 517=0203
+# 518
+# 519=0221, 520=0222 (Rishayon Rashut HaSapanut VeHanmalim)
+# 521
+# 522=2402 (IshurSichrurMutne Maabadot)
+# 524=0715 aaa רשיון לתכשיר לפי צו תכשירים להדברת מזיקים לאדם
+# 526=2303 (Ishur Kamat Haganat HaSviva)
+# 527=0319 (Ishur Hatarat Ziud Du Shimushi LeTchumei HaRashap)
+# 528,
+# 532=1204 aaa אישור מפקח על הכבאות
+ConfirmationTypeID_table = dict()
+ConfirmationTypeID_table['1'] = "0101"
+ConfirmationTypeID_table['2'] = "0102"
+ConfirmationTypeID_table['3'] = "0103"
+ConfirmationTypeID_table['4'] = "0104"
+ConfirmationTypeID_table['5'] = "0105"
+ConfirmationTypeID_table['7'] = "0107"
+ConfirmationTypeID_table['9'] = "0109"
+ConfirmationTypeID_table['10'] = "0110"
+ConfirmationTypeID_table['16'] = "אישור יצוא שירותים להגנת הצומח"
+ConfirmationTypeID_table['18'] = "0201"
+ConfirmationTypeID_table['19'] = "0204"
+ConfirmationTypeID_table['22'] = "0207"
+ConfirmationTypeID_table['24'] = "0209"
+ConfirmationTypeID_table['25'] = "0210"
+ConfirmationTypeID_table['26'] = "0212"
+ConfirmationTypeID_table['27'] = "0213"
+ConfirmationTypeID_table['28'] = "0214"
+ConfirmationTypeID_table['29'] = "0215"
+ConfirmationTypeID_table['31'] = "0217"
+ConfirmationTypeID_table['32'] = "0218"
+ConfirmationTypeID_table['33'] = 'רשיון יצוא אגף הרכב ושירותי תחזוקה - צמ"ה'
+ConfirmationTypeID_table['34'] = "0202"
+ConfirmationTypeID_table['36'] = "0302"
+ConfirmationTypeID_table['37'] = "0303"
+ConfirmationTypeID_table['39'] = "0305"
+ConfirmationTypeID_table['40'] = "0307"
+ConfirmationTypeID_table['41'] = "0308"
+ConfirmationTypeID_table['42'] = "0309"
+ConfirmationTypeID_table['43'] = "0310"
+ConfirmationTypeID_table['44'] = "0311"
+ConfirmationTypeID_table['47'] = "0315"
+ConfirmationTypeID_table['53'] = "0402"
+ConfirmationTypeID_table['54'] = "אישור מפמכ"
+ConfirmationTypeID_table['58'] = "0501"
+ConfirmationTypeID_table['60'] = "0602"
+ConfirmationTypeID_table['61'] = "0603"
+ConfirmationTypeID_table['62'] = "0604"
+ConfirmationTypeID_table['66'] = "0701"
+ConfirmationTypeID_table['67'] = "0702"
+ConfirmationTypeID_table['68'] = "0703"
+ConfirmationTypeID_table['69'] = "0704"
+ConfirmationTypeID_table['70'] = "0705"
+ConfirmationTypeID_table['71'] = "0706"
+ConfirmationTypeID_table['72'] = "0708"
+ConfirmationTypeID_table['73'] = "0709"
+ConfirmationTypeID_table['74'] = "0710"
+ConfirmationTypeID_table['75'] = "רשיון יבוא מלשכת הבריאות בנפת רמלה"
+ConfirmationTypeID_table['78'] = "0802"
+ConfirmationTypeID_table['80'] = "אישור אגף ניהול משאבי תשתיות"     # במשרד האנרגיה
+ConfirmationTypeID_table['82'] = "1001"
+ConfirmationTypeID_table['87'] = "1101"
+ConfirmationTypeID_table['89'] = "1201"
+ConfirmationTypeID_table['91'] = "1301"
+ConfirmationTypeID_table['96'] = "אישור מנכל המדע התרבות והספורט"
+ConfirmationTypeID_table['98'] = "אישור מנכל חינוך"
+ConfirmationTypeID_table['101'] = "אישור מנכל בינוי ושיכון"
+ConfirmationTypeID_table['103'] = "רשיון יבוא"
+ConfirmationTypeID_table['106'] = "2101"
+ConfirmationTypeID_table['109'] = "0325"
+ConfirmationTypeID_table['113'] = "1203"
+ConfirmationTypeID_table['118'] = "0713"
+ConfirmationTypeID_table['123'] = "2301"
+ConfirmationTypeID_table['515'] = "0804"
+ConfirmationTypeID_table['516'] = "0219"
+ConfirmationTypeID_table['517'] = "0203"
+ConfirmationTypeID_table['519'] = "0221"
+ConfirmationTypeID_table['520'] = "0222"
+ConfirmationTypeID_table['522'] = "2402"
+ConfirmationTypeID_table['524'] = "0715"
+ConfirmationTypeID_table['526'] = "2303"
+ConfirmationTypeID_table['527'] = "0319"
+ConfirmationTypeID_table['532'] = "1204"
+#ConfirmationTypeID_table[''] = ""
+
+
+# RegularityPublicationCodeID column
+# המקור החוקי לדרישה
+# 'RegularityPublicationCodeID': '1'  is Tosefet 2 LeZav Yevu Hofshi תוספת 2 לצו יבוא חופשי
+# 3  "Hakika Acheret LeZav Matan Rishyonot Yevu" חקיקה אחרת לצו מתן רשיונות יבוא
+# 'RegularityPublicationCodeID': '7' is "Ishur Mancal LeTaarif Meches" אישור מנכל לתעריף מכס
+# RegularityPublicationCodeID    '16' is "Hakika Acheret LeZav Aluf"     חקיקה אחרת לצו אלוף
+# 'RegularityPublicationCodeID': '20' is Tosefet 2 LeZav Yevu Ishi!!!   תוספת 2 לצו יבוא אישי
+RegularityPublicationCode_table = dict()
+RegularityPublicationCode_table['1'] = "תוספת 2 לצו יבוא חופשי"
+RegularityPublicationCode_table['3'] = "חקיקה אחרת לצו מתן רשיונות יבוא"
+RegularityPublicationCode_table['7'] = "אישור מנכל לתעריף מכס"
+RegularityPublicationCode_table['16'] = "חקיקה אחרת לצו אלוף"
+RegularityPublicationCode_table['20'] = "תוספת 2 לצו יבוא אישי"
+
+# AuthorityID
+# 1=Misrad HaChaklaut, 2=Misrad HaTachbura 3=Misrad HaCalcala 4=MachonHaTkanim 5=Rashut Hamisim 6=HaMisrad LeHaganat HaSviva
+# 7=Misrad HaBriut, 8=Misrad HaBitachon 9=Misrad Roham 10=Misrad HaEnergia 11=Rabanut Roshit 12=Misrad Bitachon Pnim
+# 13=Misrad HaTikshoret 15=Misrad HaTarbut VeHaSport(?) 16=Misrad HaChinuch(?) 18=Misrad HaShikun
+# 19=aaa נציגות קונסולרית ישראלית בחוץ לארץ
+# 21=Rashut HaAtikot 23=Haminhal HaEzrachi 24=MaabedetBdika
+AuthorityID_table = dict()
+AuthorityID_table['1'] = "משרד החקלאות"
+AuthorityID_table['2'] = "משרד התחבורה"
+AuthorityID_table['3'] = "משרד הכלכלה"
+AuthorityID_table['4'] = "מכון התקנים"
+AuthorityID_table['5'] = "רשות המיסים"
+AuthorityID_table['6'] = "המשרד להגנת הסביבה"
+AuthorityID_table['7'] = "משרד הבריאות"
+AuthorityID_table['8'] = "משרד הבטחון"
+AuthorityID_table['9'] = "משרד ראש הממשלה"
+AuthorityID_table['10'] = "משרד האנרגיה"
+AuthorityID_table['11'] = "הרבנות הראשית"
+AuthorityID_table['12'] = "המשרד לבטחון פנים"
+AuthorityID_table['13'] = "משרד התקשורת"
+AuthorityID_table['15'] = "משרד התרבות והספורט"
+AuthorityID_table['16'] = "משרד החינוך"
+AuthorityID_table['18'] = "משרד הבינוי והשיכון"
+AuthorityID_table['19'] = "נציגות קונסולרית ישראלית בחוץ לארץ"
+AuthorityID_table['21'] = "רשות העתיקות"
+AuthorityID_table['23'] = "המנהל האזרחי"
+AuthorityID_table['24'] = "מעבדת בדיקה"
+
+
+
 def create_server_connection(host_name, user_name, user_password):
     connection = None
     try:
@@ -147,7 +337,7 @@ def retrieve_sons(connection, itemId):
 
 
 def retrieve_only_leaves(connection):
-    limit = 100
+    limit = 17400
     count = 0
     query = "SELECT ID FROM CustomsItem where CustomsBookTypeID = 1 and FullClassification not like '-%';"
     results, columns = read_query(connection, query)
@@ -167,7 +357,7 @@ def retrieve_only_leaves(connection):
             #print("item", itemId, "has no sons")
     howManyLeaves = len(list_of_leaves)
     print("found", howManyLeaves, "leaves in", limit, "items")
-    print(list_of_leaves[0:10])
+    #print(list_of_leaves[0:10])
     return list_of_leaves
 
 
@@ -252,6 +442,24 @@ def retrieve_some_data_of_customs_item(connection, item_full_classification):
     #print(df["CustomsItemHierarchicLocationID"])
 
 
+def cache_parents_of_all_item_ids(connection):
+    global parents_of_items_cache
+    if len(parents_of_items_cache) > 0:
+        return
+    query = "SELECT ID, Parent_CustomsItemID FROM CustomsItem;"
+    results, columns = read_query(connection, query)
+    list_of_tuples = [(str(x[0]), x[1]) for x in results]
+    parents_of_items_cache = dict(list_of_tuples)
+
+def cache_full_classification_of_all_item_ids(connection):
+    global full_classification_of_item_ids_cache
+    if len(full_classification_of_item_ids_cache) > 0:
+        return
+    query = "SELECT ID, FullClassification FROM CustomsItem;"
+    results, columns = read_query(connection, query)
+    list_of_tuples = [(str(x[0]), x[1]) for x in results]
+    full_classification_of_item_ids_cache = dict(list_of_tuples)
+
 def retrieve_full_classification_of_item_ids(connection, list_of_item_ids):
     query = "SELECT ID, FullClassification FROM CustomsItem;"
     results, columns = read_query(connection, query)
@@ -262,30 +470,73 @@ def retrieve_full_classification_of_item_ids(connection, list_of_item_ids):
     #print(list_of_full_classifications[0:10])
     print(list_of_tuples[0:10])
 
+def retrieve_full_classification_of_item_ids(connection, list_of_item_ids):
+    list_of_tuples = list()
+    for item_id in list_of_item_ids:
+        tup = tuple((item_id, full_classification_of_item_ids_cache[item_id]))
+        #full_classification_of_item_ids_cache[item_id]
+        list_of_tuples.append(tup)
+    print(list_of_tuples)
+    return list_of_tuples
 
-def retrieve_parent(connection, customs_item_id):
+
+def retrieve_parent1(connection, customs_item_id):
     query = "SELECT ID, Parent_CustomsItemID FROM CustomsItem where CustomsBookTypeID = 1 and ID = '" + customs_item_id + "';"
     results, columns = read_query(connection, query)
     # assuming only 1 row in the result!
     parent_id = results[0][1]
-    print("for item id", customs_item_id, "the parent is", parent_id)
+    #print("for item id", customs_item_id, "the parent is", parent_id)
     return parent_id
+
+def retrieve_parent(connection, customs_item_id):
+    parent_id = parents_of_items_cache[customs_item_id]
+    if parent_id is None:
+        parent_id=0
+    return parent_id
+
+def list_of_full_classifications(list_of_customs_item_ids):
+    list_of_fc = [full_classification_of_item_ids_cache[item_id] for item_id in list_of_customs_item_ids]
+    return list_of_fc
+
+
+def zipped_list_of_full_classifications(list_of_customs_item_ids):
+    fcs = list_of_full_classifications(list_of_customs_item_ids)
+    zipped = list(zip(list_of_customs_item_ids, fcs))
+    #print(zipped)
+    return zipped
 
 
 def retrieve_all_parents_of_item(connection, customs_item_id):
+    """
+    From a customs-item, find its parent, and then its parent, etc. up to the
+    item that has no parent.
+
+    :param connection: a connection object to the SQL DB
+    :param customs_item_id: id of the item (in CustomsItem table)
+    :return: list of ids of item and all its parents, in order of walking up.
+    """
+    list_of_parents = list()
+    list_of_parents.append(customs_item_id)
     idd = customs_item_id
-    list_of_parents = list(customs_item_id)
     while True:
         parent_id = retrieve_parent(connection, idd)
         if parent_id == 0:
             break
         list_of_parents.append(str(parent_id))
         idd = str(parent_id)
-    print("list of parents is", list_of_parents)
-    return list_of_parents
+    list_of_fc = list_of_full_classifications(list_of_parents)
+    zipped_list = zipped_list_of_full_classifications(list_of_parents)
+    #print("list of parents is", zipped_list)
+    return list_of_parents, list_of_fc, zipped_list
 
 
 def only_date(date1):
+    """
+    Calculate from a date object only the date part and return it as a string
+
+    :param date1: the date object
+    :return: a string with only the date
+    """
     date_time_str = str(date1)
     date_only = date_time_str.split(' ')[0]
     return date_only
@@ -337,7 +588,7 @@ def retrieve_regularity_requirement(connection, item_id):
             "and rrc.RegularityInceptionID=ri.ID " + \
             "and rr.CustomsItemID='" + item_id + "';"
     results, columns = read_query(connection, query)
-    print(columns)
+    #print(columns)
     #('ID', 'TypeID', 'Title', 'State', 'CreateDate', 'CreateUserID', 'UpDatetimeDate', 'UpDatetimeUserID', 'OrganizationUnitID', 'CustomerID', 'CountryID', 'IsAllCountries', 'CustomsItemID', 'IsAllCustomsItems', 'IsLimitedCountryRegularityRequirement', 'StartDate', 'EndDate', 'MekachDate', 'InceptionCodeID', 'RegularityPublicationCodeID19', '20RegularitySourceCodeID', 'CustomsBookTypeID', 'MekachID', 'ID', 'RegularityRequirementID', 'InterConditionsRelationshipID', 'IsPersonalImportIncluded', 'RequirementGoodsDescription', 'RegularityRequirementWarningsID', 'IsCarnetIncluded', 'ID', 'RegularityInceptionID', 'ConfirmationTypeID', 'CNumber', 'TextualCondition', 'TrNumber', 'AuthorityID')
     #0: (3962, 0, 'TEMPORARILY_NULL', 0, datetime.datetime(2011, 6, 1, 0, 0), 0, datetime.datetime(1970, 1, 1, 2, 0), 0, 0, 0, 0, 1, 26074, 0, 0, datetime.datetime(2011, 6, 1, 0, 0), datetime.datetime(2069, 12, 31, 0, 0), datetime.datetime(1970, 1, 1, 2, 0), 1, 1, 2, 1, 0, 3499, 3962, 1, 1, ' ', 0, 0, 1818, 3499, 1, 0, '', 0, 1)
     #0: (5934, 0, 'TEMPORARILY_NULL', 0, datetime.datetime(2020, 3, 25, 0, 0), 0, datetime.datetime(1970, 1, 1, 2, 0), 0, 0, 0, 0, 1, 26074, 0, 0, datetime.datetime(2011, 6, 1, 0, 0), datetime.datetime(2069, 12, 31, 0, 0), datetime.datetime(1970, 1, 1, 2, 0), 1, 20, 2, 1, 0, 7108, 5934, 1, 1, ' ', 0, 0, 10310, 7108, 1, 0, '', 0, 1)
@@ -345,44 +596,52 @@ def retrieve_regularity_requirement(connection, item_id):
     counter = 0
     reqs = list()
     for row in results:
-        # 'RegularityPublicationCodeID': '1' is Tosefet 2 LeZav Yevu Hofshi
-        # 'RegularityPublicationCodeID': '20' is Tosefet 2 LeZav Yevu Ishi!!!
-        print(str(counter), ":",row)
+        # המקור החוקי לדרישה
+        # 'RegularityPublicationCodeID': '1'  is Tosefet 2 LeZav Yevu Hofshi תוספת 2 לצו יבוא חופשי
+        # 3  "Hakika Acheret LeZav Matan Rishyonot Yevu" חקיקה אחרת לצו מתן רשיונות יבוא
+        # 'RegularityPublicationCodeID': '7' is "Ishur Mancal LeTaarif Meches" אישור מנכל לתעריף מכס
+        # RegularityPublicationCodeID    '16' is "Hakika Acheret LeZav Aluf"     חקיקה אחרת לצו אלוף
+        # 'RegularityPublicationCodeID': '20' is Tosefet 2 LeZav Yevu Ishi!!!   תוספת 2 לצו יבוא אישי
+        #print(str(counter), ":",row)
         d = dict()
         d['order'] = counter
         # column numbers below depend on the exact query hard-coded above!
         d['RegularityRequirementID'] = str(row[0])
-        d['from_item'] = item_id    # TODO should be full classification of this id
+        d['from_item'] = item_id
+        d['from_item_fc'] = full_classification_of_item_ids_cache[item_id]
         d['create_date'] = only_date(row[4])
         d['update_date'] = only_date(row[6])
         d['start_date'] = only_date(row[15])
         d['end_date'] = only_date(row[16])
         d['InceptionCodeID'] = str(row[18])
-        d['RegularityPublicationCodeID'] = str(row[19])     # see comment above!!
+        d['RegularityPublicationCodeID'] = str(row[19])     # מקור חוקי לדרישה  see comment above!!
         #'20RegularitySourceCodeID', 'CustomsBookTypeID', 'MekachID', 'ID', 'RegularityRequirementID', 'InterConditionsRelationshipID', 'IsPersonalImportIncluded', 'RequirementGoodsDescription', 'RegularityRequirementWarningsID', 'IsCarnetIncluded',
         # '30ID', 'RegularityInceptionID', 'ConfirmationTypeID', 'CNumber', 'TextualCondition', 'TrNumber', 'AuthorityID')
         d['RegularityInceptionID'] = str(row[23])
-        d['InterConditions'] = str(row[25])
+        d['InterConditions'] = str(row[25])     # יחס תנאים
         if d['InterConditions']=='1':
             d['InterConditions']='1-All'
+        if d['InterConditions'] == '2':
+            d['InterConditions']='2-Tnay Yachid'
         elif d['InterConditions']=='3':
-            d['InterConditions']='3-Alt'
-        d['personal'] = str(row[26])    #1=Yes, 0=No
+            d['InterConditions']='3-Alt'    # חליפי
+        d['personal'] = str(row[26])    #1=Yes, 0=No    # חל ביבוא אישי
         if d['personal']=='1':
             d['personal']='1-Yes'
         elif d['personal']=='0':
             d['personal']='0-No'
         d['description'] = str(row[27])
         d['RegularityRequiredCertificateID'] = str(row[30])
-        d['ConfirmationTypeID'] = str(row[32]) # (together with AuthorityID?) 1=0101(Vetrinary), 2=0102(HaganatHazomeach) 66=0701 67=0702 68=0703 70=0705 39=0305
+        # ConfirmationTypeID (together with AuthorityID?): see ConfirmationTypeID_table and comments at beginning of file
+        d['ConfirmationTypeID'] = str(row[32]) + '-' + ConfirmationTypeID_table[str(row[32])]      # סוג אישור
         d['CNumber'] = str(row[33])
-        d['TextualCondition'] = str(row[34])
-        d['TrNumber'] = str(row[35])
-        d['AuthorityID'] = str(row[36]) # 7=Misrad HaBriut, 1=Misrad HaChaklaut, 3=Misrad HaCalcala
+        d['TextualCondition'] = str(row[34])    # תיאור תנאים
+        d['TrNumber'] = str(row[35])    # תיאור תנאים
+        d['AuthorityID'] = str(row[36]) + '-' + AuthorityID_table[str(row[36])] # see AuthorityID_table and comments at beginning of file
         # append only lines in which current date is between d['start_date'] and d['end_date'] = only_date(row[16])
-        reqs.append(d)
-        # if current_date>d['start_date'] and current_date<d['end_date']:
-        #     reqs.append(d)
+        #reqs.append(d)
+        if current_date>d['start_date'] and current_date<d['end_date']:
+            reqs.append(d)
         counter = counter + 1
     #print(reqs)
     return reqs
@@ -413,13 +672,17 @@ def retrieve_regularity_requirement1(connection, item_id):
     return reqs
 
 
+def print_flattened_list(lis):
+    for item in lis:
+        print(item)
+
 def retrieve_for_all_parents(connection, item_id):
     """
     This method retrieves from SQL db, the whole data that is displayed in the part of Regulatory Requirements.
     It does the walking from item-id to all its parents.
     item-id is assumed to be a leaf
     """
-    list_of_parents = retrieve_all_parents_of_item(connection, item_id)
+    list_of_parents, fcs, zipped = retrieve_all_parents_of_item(connection, item_id)
     all_reqs = list()
     for item in list_of_parents:
         reqs = retrieve_regularity_requirement(connection, item)
@@ -428,21 +691,64 @@ def retrieve_for_all_parents(connection, item_id):
         all_reqs.append(reqs)
     # now flatten the list of lists
     flattened_list = list(chain.from_iterable(all_reqs))
-    print(flattened_list)
+    #print('===============')
+    #print(zipped)
+    #print_flattened_list(flattened_list)
+    return flattened_list
+
+def unknown_confirmation_type():
+    global known_confirmation_id
+    global all_conf_ids
+    known = set(known_confirmation_id)
+    all = set(all_conf_ids)
+    unknown_conf_ids = all.difference(known)
+    str_unknown_conf_ids = [str(x) for x in unknown_conf_ids]
+    return str_unknown_conf_ids
+
+
+def find_all_confirmation_ids(connection):
+    query = "SELECT ID, ConfirmationTypeID FROM RegularityRequiredCertificate;"
+    results, columns = read_query(connection, query)
+    all_ids = set()
+    for row in results:
+        all_ids.add(row[1])
+    print(sorted(all_ids))
 
 
 def do_some_queries():
     connection = connect()
     if connection is None:
         exit(-1)
+    # fill caches from DB
+    cache_full_classification_of_all_item_ids(connection)
+    cache_parents_of_all_item_ids(connection)
     #retrieve_customs_item_by_full_classification(connection, '4823691000')
     #retrieve_some_data_of_customs_item(connection, 'XV')
     #retrieve_parent_items_of_customs_item(connection, '4823691000')
     #retrieve_customs_item_by_full_classification(connection, 'XV')
     #retrieve_all_import_Full_Classifications_as_sorted_list(connection)
-    list_of_ids = retrieve_only_leaves(connection)
-    retrieve_full_classification_of_item_ids(connection, list_of_ids)
-    retrieve_for_all_parents(connection, list_of_ids[5])
+    #list_of_parents = retrieve_all_parents_of_item(connection, '16')
+    #print(list_of_parents)
+    find_all_confirmation_ids(connection)
+    unknown_conf_ids = unknown_confirmation_type()
+    list_of_leave_ids = retrieve_only_leaves(connection)
+    #list_of_leave_ids.insert(0, '25783')
+    # retrieve_full_classification_of_item_ids(connection, list_of_ids)
+    set_found_conf_ids = set()
+    counter = 0
+    print("searching all", len(list_of_leave_ids), "leaf items...")
+    for item in list_of_leave_ids:
+        counter = counter + 1
+        if counter%100==0:
+            print(counter)
+        list_of_regulations = retrieve_for_all_parents(connection, item)
+        for reg in list_of_regulations:
+            conf_id = reg['ConfirmationTypeID']
+            if conf_id in unknown_conf_ids:
+                set_found_conf_ids.add(conf_id)
+                print(item)
+                print(reg)
+        #print(list_of_regulations[0])
 
 
 def main():
@@ -503,3 +809,22 @@ if __name__ == "__main__":
 #     {'order': 3, 'RegularityRequirementID': '3546', 'from_item': '11448', 'create_date': '2009-05-10', 'update_date': '1970-01-01', 'start_date': '2009-05-10', 'end_date': '2069-12-31', 'InceptionCodeID': '2', 'RegularityPublicationCodeID': '1', 'RegularityInceptionID': '5023', 'InterConditions': '1-All', 'personal': '0', 'description': 'למאכל אדם', 'RegularityRequiredCertificateID': '2119', 'ConfirmationTypeID': '70', 'CNumber': '0', 'TextualCondition': '', 'TrNumber': '0', 'AuthorityID': '7'},
 #     {'order': 4, 'RegularityRequirementID': '3546', 'from_item': '11448', 'create_date': '2009-05-10', 'update_date': '1970-01-01', 'start_date': '2009-05-10', 'end_date': '2069-12-31', 'InceptionCodeID': '2', 'RegularityPublicationCodeID': '1', 'RegularityInceptionID': '5024', 'InterConditions': '1-All', 'personal': '0', 'description': 'המיועד לייצור תרופות', 'RegularityRequiredCertificateID': '2120', 'ConfirmationTypeID': '67', 'CNumber': '0', 'TextualCondition': '', 'TrNumber': '0', 'AuthorityID': '7'}
 # ]
+
+# ===============
+# in following case, web-site united 13+14, 16+19, 17+18 ! why? same AuthorityID, same ConfirmationID, InterConditions=3(Alternate). It appended TrNumber and TextualCondirion (with '/')
+# [('25783', '8517629000'), ('23655', '8517620000'), ('14701', '8517600000'), ('10352', '8517000000'), ('8901', '8500000000'), ('16194', 'XVI')]
+# {'order': 4, 'RegularityRequirementID': '2671', 'from_item': '14701', 'from_item_fc': '8517600000', 'create_date': '2017-05-01', 'update_date': '1970-01-01', 'start_date': '2017-05-01', 'end_date': '2069-12-31', 'InceptionCodeID': '2', 'RegularityPublicationCodeID': '1', 'RegularityInceptionID': '3290', 'InterConditions': '1-All', 'personal': '1-Yes', 'description': 'מתאם תקשורת לרשת החשמל (ציוד המעביר מידע על קווי רשת החשמל) יחול בייבוא אישי ומסחרי למעט ציוד שבו פועלת טכנולוגיית blue tooth ולמעט שעון יד אלחוטי', 'RegularityRequiredCertificateID': '7630', 'ConfirmationTypeID': '91', 'CNumber': '0', 'TextualCondition': '', 'TrNumber': '0', 'AuthorityID': '13'}
+# {'order': 7, 'RegularityRequirementID': '5236', 'from_item': '14701', 'from_item_fc': '8517600000', 'create_date': '2020-03-25', 'update_date': '1970-01-01', 'start_date': '2017-05-01', 'end_date': '2069-12-31', 'InceptionCodeID': '2', 'RegularityPublicationCodeID': '20', 'RegularityInceptionID': '7006', 'InterConditions': '1-All', 'personal': '1-Yes', 'description': 'מתאם תקשורת לרשת (ציוד המעביר מידע על קווי רשת החשמל) למעט ציוד טכנולוגי מסוג BLUE TOOTH, שעון יד חכם, נתב (ראוטר) לשימוש תוך-ביתי, נקודת גישה לשימוש תוך-ביתי ומגדיל טווח בטכנולוגיית WIFI לשימוש תוך-ביתי', 'RegularityRequiredCertificateID': '11903', 'ConfirmationTypeID': '91', 'CNumber': '0', 'TextualCondition': '', 'TrNumber': '0', 'AuthorityID': '13'}
+# {'order': 12, 'RegularityRequirementID': '2716', 'from_item': '10352', 'from_item_fc': '8517000000', 'create_date': '2014-01-20', 'update_date': '1970-01-01', 'start_date': '2014-01-20', 'end_date': '2069-12-31', 'InceptionCodeID': '2', 'RegularityPublicationCodeID': '1', 'RegularityInceptionID': '4023', 'InterConditions': '1-All', 'personal': '1-Yes', 'description': 'למעט ציוד אופטי וציוד לרשת תקשורת מקומית קווית שאינו מיועד להתחבר לרשת בזק ציבורית ולמעט פרט המכס 85.17.7000 ולמעט טכנולוגיית ANT+ /ANT , חלקי חילוף לציוד קצה וציוד המסומן בסימון CE ', 'RegularityRequiredCertificateID': '6761', 'ConfirmationTypeID': '91', 'CNumber': '0', 'TextualCondition': '', 'TrNumber': '0', 'AuthorityID': '13'}
+# {'order': 13, 'RegularityRequirementID': '2716', 'from_item': '10352', 'from_item_fc': '8517000000', 'create_date': '2014-01-20', 'update_date': '1970-01-01', 'start_date': '2014-01-20', 'end_date': '2069-12-31', 'InceptionCodeID': '2', 'RegularityPublicationCodeID': '1', 'RegularityInceptionID': '4022', 'InterConditions': '3-Alt', 'personal': '0-No', 'description': 'מוזנות ממתח נקוב העולה על 9 וולט או מוזנות ממתח נקוב שאינו עולה על 9 וולט, אך מיובאות עם ספק כוח', 'RegularityRequiredCertificateID': '6762', 'ConfirmationTypeID': '53', 'CNumber': '0', 'TextualCondition': '60950', 'TrNumber': '60950', 'AuthorityID': '4'}
+# {'order': 14, 'RegularityRequirementID': '2716', 'from_item': '10352', 'from_item_fc': '8517000000', 'create_date': '2014-01-20', 'update_date': '1970-01-01', 'start_date': '2014-01-20', 'end_date': '2069-12-31', 'InceptionCodeID': '2', 'RegularityPublicationCodeID': '1', 'RegularityInceptionID': '4022', 'InterConditions': '3-Alt', 'personal': '0-No', 'description': 'מוזנות ממתח נקוב העולה על 9 וולט או מוזנות ממתח נקוב שאינו עולה על 9 וולט, אך מיובאות עם ספק כוח', 'RegularityRequiredCertificateID': '6763', 'ConfirmationTypeID': '53', 'CNumber': '0', 'TextualCondition': '', 'TrNumber': '60065', 'AuthorityID': '4'}
+# {'order': 15, 'RegularityRequirementID': '2711', 'from_item': '10352', 'from_item_fc': '8517000000', 'create_date': '2016-06-15', 'update_date': '1970-01-01', 'start_date': '2016-06-15', 'end_date': '2069-12-31', 'InceptionCodeID': '2', 'RegularityPublicationCodeID': '16', 'RegularityInceptionID': '3932', 'InterConditions': '1-All', 'personal': '1-Yes', 'description': 'מכשירי טלפון, כולל טלפונים לרשתות תאיות או לרשתות אלחוטיות, מכשירים אחרים לשידור וקליטה של קול, תמונות או נתונים אחרים, כולל מכשירי תקשורת ברשתות קוויות או אלחוטיות מקומיות (LAN) או אזוריות (WAN)\n', 'RegularityRequiredCertificateID': '7353', 'ConfirmationTypeID': '123', 'CNumber': '0', 'TextualCondition': '', 'TrNumber': '0', 'AuthorityID': '23'}
+# {'order': 16, 'RegularityRequirementID': '2716', 'from_item': '10352', 'from_item_fc': '8517000000', 'create_date': '2014-01-20', 'update_date': '1970-01-01', 'start_date': '2014-01-20', 'end_date': '2069-12-31', 'InceptionCodeID': '2', 'RegularityPublicationCodeID': '1', 'RegularityInceptionID': '4022', 'InterConditions': '3-Alt', 'personal': '0-No', 'description': 'מוזנות ממתח נקוב העולה על 9 וולט או מוזנות ממתח נקוב שאינו עולה על 9 וולט, אך מיובאות עם ספק כוח', 'RegularityRequiredCertificateID': '7983', 'ConfirmationTypeID': '522', 'CNumber': '0', 'TextualCondition': ' ', 'TrNumber': '60065', 'AuthorityID': '24'}
+# {'order': 17, 'RegularityRequirementID': '2716', 'from_item': '10352', 'from_item_fc': '8517000000', 'create_date': '2014-01-20', 'update_date': '1970-01-01', 'start_date': '2014-01-20', 'end_date': '2069-12-31', 'InceptionCodeID': '2', 'RegularityPublicationCodeID': '1', 'RegularityInceptionID': '4022', 'InterConditions': '3-Alt', 'personal': '0-No', 'description': 'מוזנות ממתח נקוב העולה על 9 וולט או מוזנות ממתח נקוב שאינו עולה על 9 וולט, אך מיובאות עם ספק כוח', 'RegularityRequiredCertificateID': '8670', 'ConfirmationTypeID': '109', 'CNumber': '0', 'TextualCondition': '', 'TrNumber': '60065', 'AuthorityID': '3'}
+# {'order': 18, 'RegularityRequirementID': '2716', 'from_item': '10352', 'from_item_fc': '8517000000', 'create_date': '2014-01-20', 'update_date': '1970-01-01', 'start_date': '2014-01-20', 'end_date': '2069-12-31', 'InceptionCodeID': '2', 'RegularityPublicationCodeID': '1', 'RegularityInceptionID': '4022', 'InterConditions': '3-Alt', 'personal': '0-No', 'description': 'מוזנות ממתח נקוב העולה על 9 וולט או מוזנות ממתח נקוב שאינו עולה על 9 וולט, אך מיובאות עם ספק כוח', 'RegularityRequiredCertificateID': '8671', 'ConfirmationTypeID': '109', 'CNumber': '0', 'TextualCondition': '60950', 'TrNumber': '60950', 'AuthorityID': '3'}
+# {'order': 19, 'RegularityRequirementID': '2716', 'from_item': '10352', 'from_item_fc': '8517000000', 'create_date': '2014-01-20', 'update_date': '1970-01-01', 'start_date': '2014-01-20', 'end_date': '2069-12-31', 'InceptionCodeID': '2', 'RegularityPublicationCodeID': '1', 'RegularityInceptionID': '4022', 'InterConditions': '3-Alt', 'personal': '0-No', 'description': 'מוזנות ממתח נקוב העולה על 9 וולט או מוזנות ממתח נקוב שאינו עולה על 9 וולט, אך מיובאות עם ספק כוח', 'RegularityRequiredCertificateID': '9549', 'ConfirmationTypeID': '522', 'CNumber': '0', 'TextualCondition': '60950', 'TrNumber': '60950', 'AuthorityID': '24'}
+# {'order': 24, 'RegularityRequirementID': '5268', 'from_item': '10352', 'from_item_fc': '8517000000', 'create_date': '2020-03-25', 'update_date': '1970-01-01', 'start_date': '2014-01-20', 'end_date': '2069-12-31', 'InceptionCodeID': '2', 'RegularityPublicationCodeID': '20', 'RegularityInceptionID': '7484', 'InterConditions': '3-Alt', 'personal': '1-Yes', 'description': 'למעט ציוד אופטי וציוד לרשת תקשורת מקומית קווית שאינו מיועד להתחבר לרשת בזק ציבורית, ולמעט פרט המכס 85.17.6000 ו-85.17.7000 ולמעט טלפון נייד וחלקיו', 'RegularityRequiredCertificateID': '11913', 'ConfirmationTypeID': '91', 'CNumber': '0', 'TextualCondition': '', 'TrNumber': '0', 'AuthorityID': '13'}
+# {'order': 1, 'RegularityRequirementID': '3740', 'from_item': '8901', 'from_item_fc': '8500000000', 'create_date': '2015-10-27', 'update_date': '1970-01-01', 'start_date': '2015-10-27', 'end_date': '2069-12-31', 'InceptionCodeID': '2', 'RegularityPublicationCodeID': '1', 'RegularityInceptionID': '4039', 'InterConditions': '1-All', 'personal': '1-Yes', 'description': 'טובין המותקנים על גרורים (Trailers), גרורים נתמכים (Semi – trailers), הנגררים על ידי כלי רכב, לפי נוהלי אגף הרכב', 'RegularityRequiredCertificateID': '7083', 'ConfirmationTypeID': '516', 'CNumber': '0', 'TextualCondition': '', 'TrNumber': '0', 'AuthorityID': '2'}
+# {'order': 2, 'RegularityRequirementID': '3740', 'from_item': '8901', 'from_item_fc': '8500000000', 'create_date': '2015-10-27', 'update_date': '1970-01-01', 'start_date': '2015-10-27', 'end_date': '2069-12-31', 'InceptionCodeID': '2', 'RegularityPublicationCodeID': '1', 'RegularityInceptionID': '4040', 'InterConditions': '1-All', 'personal': '1-Yes', 'description': 'נגררים שתוכננו ויוצרו בידי היצרן לשימושים חקלאיים', 'RegularityRequiredCertificateID': '7084', 'ConfirmationTypeID': '4', 'CNumber': '0', 'TextualCondition': '', 'TrNumber': '0', 'AuthorityID': '1'}
+# {'order': 3, 'RegularityRequirementID': '5822', 'from_item': '8901', 'from_item_fc': '8500000000', 'create_date': '2020-03-25', 'update_date': '1970-01-01', 'start_date': '2015-10-27', 'end_date': '2069-12-31', 'InceptionCodeID': '2', 'RegularityPublicationCodeID': '20', 'RegularityInceptionID': '7490', 'InterConditions': '3-Alt', 'personal': '1-Yes', 'description': 'לשימושים חקלאיים', 'RegularityRequiredCertificateID': '10627', 'ConfirmationTypeID': '4', 'CNumber': '0', 'TextualCondition': '', 'TrNumber': '0', 'AuthorityID': '1'}
+# {'order': 4, 'RegularityRequirementID': '5822', 'from_item': '8901', 'from_item_fc': '8500000000', 'create_date': '2020-03-25', 'update_date': '1970-01-01', 'start_date': '2015-10-27', 'end_date': '2069-12-31', 'InceptionCodeID': '2', 'RegularityPublicationCodeID': '20', 'RegularityInceptionID': '7488', 'InterConditions': '3-Alt', 'personal': '1-Yes', 'description': 'טובין המותקנים על גרורים (Trailers), גרורים נתמכים (Semi – trailers), הנגררים על ידי כלי רכב נגררים שתוכננו ויוצרו בידי היצרן', 'RegularityRequiredCertificateID': '10832', 'ConfirmationTypeID': '516', 'CNumber': '0', 'TextualCondition': '', 'TrNumber': '0', 'AuthorityID': '2'}
