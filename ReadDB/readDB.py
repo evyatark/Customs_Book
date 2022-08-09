@@ -319,12 +319,14 @@ def retrieve_regularity_inception(connection, req):
 
 def retrieve_regularity_requirement(connection, item_id):
     """
-    This method retrieves from SQL db the whole data that is displayed in the part of Regulatory Requirements.
+    This method retrieves from SQL db, **for a single item-id** the data that is displayed in the part of Regulatory Requirements.
     The logic here is based on our assumptions of how the web-site pages are created from the data.
     In some edge cases it is not yet complete.
-    Known Issues:
-    1. How exactly does the web-site decide which rows to include in the display?
-       It is according to start-date and end-date, but in some cases it is not straight-forward
+     Known Issues:
+       1. How exactly does the web-site decide which rows to include in the display?
+          It is according to start-date and end-date, but in some cases it is not straight-forward
+       2. query is hard-coded
+       3. column numbers are used, and they depend on the exact query
     """
     current_date = '2022-08-08'     # TODO not hard-coded
     # Note that the following query dictates the order of columns in the result, which is
@@ -411,6 +413,24 @@ def retrieve_regularity_requirement1(connection, item_id):
     return reqs
 
 
+def retrieve_for_all_parents(connection, item_id):
+    """
+    This method retrieves from SQL db, the whole data that is displayed in the part of Regulatory Requirements.
+    It does the walking from item-id to all its parents.
+    item-id is assumed to be a leaf
+    """
+    list_of_parents = retrieve_all_parents_of_item(connection, item_id)
+    all_reqs = list()
+    for item in list_of_parents:
+        reqs = retrieve_regularity_requirement(connection, item)
+        if len(reqs) == 0:
+            continue
+        all_reqs.append(reqs)
+    # now flatten the list of lists
+    flattened_list = list(chain.from_iterable(all_reqs))
+    print(flattened_list)
+
+
 def do_some_queries():
     connection = connect()
     if connection is None:
@@ -422,16 +442,8 @@ def do_some_queries():
     #retrieve_all_import_Full_Classifications_as_sorted_list(connection)
     list_of_ids = retrieve_only_leaves(connection)
     retrieve_full_classification_of_item_ids(connection, list_of_ids)
-    list_of_parents = retrieve_all_parents_of_item(connection, list_of_ids[5])
-    all_reqs = list()
-    for item in list_of_parents:
-        reqs = retrieve_regularity_requirement(connection, item)
-        if len(reqs) == 0:
-            continue
-        all_reqs.append(reqs)
-    #now flatten the list of lists
-    flattened_list = list(chain.from_iterable(all_reqs))
-    print(flattened_list)
+    retrieve_for_all_parents(connection, list_of_ids[5])
+
 
 def main():
     #do_simple_query()
