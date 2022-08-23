@@ -18,7 +18,7 @@
 
 1. Web Scraping של אתר האינטרנט
 
-2. קבצי מידע אשר ניתנים להורדה מאתר האינטרנט
+2. קבצי מידע אשר ניתנים להורדה מאתר האינטרנט (ראה [כאן](ShaarOlamy_DataFiles.md))
 
 3. טבלאות ערכים כלליות אשר ניתנות להורדה מאתר האינטרנט
 
@@ -28,3 +28,5 @@ https://shaarolami-query.customs.mof.gov.il/CustomspilotWeb/he/CustomsBook/Home/
 
 טבלאות "קהילתיות" של מערכת שער עולמי נמצאות כאן
 https://www.gov.il/apps/taxes/systemtable/
+
+</div>
