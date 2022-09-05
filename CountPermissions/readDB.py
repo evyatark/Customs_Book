@@ -8,6 +8,7 @@ from itertools import chain
 
 
 full_classification_of_item_ids_cache = dict()
+item_id_of_full_classification_cache = dict()
 parents_of_items_cache = dict()
 
 known_confirmation_id=(        # ConfirmationTypeID (together with AuthorityID?):
@@ -220,7 +221,7 @@ def create_db_connection(host_name, user_name, user_password, db_name):
             passwd=user_password,
             database=db_name
         )
-        print(f"MySQL Database connection successful (hostname='{host_name}', database name='{db_name}')")
+        # print(f"MySQL Database connection successful (hostname='{host_name}', database name='{db_name}')")
     except Error as err:
         print(f"==> Error: '{err}'")
         print(f"==> maybe you need to start the database with: docker start mysql_server_custom_book")
@@ -326,8 +327,6 @@ def retrieve_customs_item_by_full_classification(connection, item_full_classific
     print(df.to_string())
     return df
 
-def retrieve_customs_item_by_item_id():
-    pass
 
 
 def retrieve_sons(connection, itemId):
@@ -397,6 +396,7 @@ def retrieve_parent_items_of_customs_item(connection, item_full_classification):
     list_of_full_classifications.sort()
     print(list_of_full_classifications[0:10])
 
+
 def retrieve_items_of_customs_item(connection, item_full_classification):
     query = "SELECT FullClassification FROM CustomsItem;"
     query2 = "SELECT FullClassification, ID FROM CustomsItem;"      # this would work with same results - because all tuples will have 2 members, but we take the first
@@ -454,12 +454,20 @@ def cache_parents_of_all_item_ids(connection):
 
 def cache_full_classification_of_all_item_ids(connection):
     global full_classification_of_item_ids_cache
+    global item_id_of_full_classification_cache
     if len(full_classification_of_item_ids_cache) > 0:
         return
-    query = "SELECT ID, FullClassification FROM CustomsItem;"
+    query = "SELECT ID, FullClassification FROM CustomsItem" + " WHERE CustomsBookTypeID = 1;"
     results, columns = read_query(connection, query)
     list_of_tuples = [(str(x[0]), x[1]) for x in results]
     full_classification_of_item_ids_cache = dict(list_of_tuples)
+    item_id_of_full_classification_cache = dict([(str(x[1]), x[0]) for x in results])
+
+
+def get_item_id_of_full_classification(fullClassification):
+    if fullClassification in item_id_of_full_classification_cache:
+        return str(item_id_of_full_classification_cache[fullClassification])
+    return None
 
 
 def retrieve_full_classification_of_item_ids1(connection, list_of_item_ids):
@@ -493,7 +501,9 @@ def retrieve_parent1(connection, customs_item_id):
 
 
 def retrieve_parent(connection, customs_item_id):
-    parent_id = parents_of_items_cache[customs_item_id]
+    parent_id = 0
+    if customs_item_id in parents_of_items_cache:
+        parent_id = parents_of_items_cache[customs_item_id]
     if parent_id is None:
         parent_id=0
     return parent_id
@@ -668,6 +678,7 @@ def retrieve_regularity_requirement(connection, item_id):
     #print(reqs)
     return reqs
 
+
 def retrieve_regularity_requirement1(connection, item_id):
     query = "select * from RegularityRequirement where CustomsItemID='" + item_id + "';"
     results, columns = read_query(connection, query)
@@ -705,6 +716,10 @@ def retrieve_for_all_parents(connection, item_id):
     It does the walking from item-id to all its parents.
     item-id is assumed to be a leaf
     """
+    # fill caches from DB
+    cache_full_classification_of_all_item_ids(connection)
+    cache_parents_of_all_item_ids(connection)
+
     list_of_parents, fcs, zipped = retrieve_all_parents_of_item(connection, item_id)
     all_reqs = list()
     for item in list_of_parents:
@@ -714,9 +729,9 @@ def retrieve_for_all_parents(connection, item_id):
         all_reqs.append(reqs)
     # now flatten the list of lists
     flattened_list = list(chain.from_iterable(all_reqs))
-    print('===============')
-    print(zipped)
-    print_flattened_list(flattened_list)
+    #print('===============')
+    #print(zipped)
+    #print_flattened_list(flattened_list)
     return flattened_list
 
 
@@ -738,6 +753,7 @@ def find_all_confirmation_ids(connection):
         all_ids.add(row[1])
     print(sorted(all_ids))
 
+
 def searchConfirmationTypeIDs(connection):
     find_all_confirmation_ids(connection)
     unknown_conf_ids = unknown_confirmation_type()
@@ -757,6 +773,16 @@ def searchConfirmationTypeIDs(connection):
                 print(item)
                 print(reg)
         # print(list_of_regulations[0])
+
+
+def initialize_connection_and_caches():
+    connection = connect()
+    if connection is None:
+        exit(-1)
+    # fill caches from DB
+    cache_full_classification_of_all_item_ids(connection)
+    cache_parents_of_all_item_ids(connection)
+    return connection
 
 
 def do_some_queries():
@@ -786,9 +812,10 @@ def main():
     # do_dataframe_query()
     # do_some_queries()
     # list_of_parents= retrieve_all_parents_of_item(connect(), '4')
-    list_of_regulations = retrieve_for_all_parents(connect(), '20729')
-
-
+    #df = retrieve_customs_item_by_full_classification(connect(), '1509903200')
+    list_of_regulations = retrieve_for_all_parents(connect(), '32739')
+#32739 - some exception: KeyError: '32739' - it has no parents and no FullClassification (should be 1509903200)
+# probably this is because DB is not up-to-date?
 
 
 
@@ -797,5 +824,3 @@ if __name__ == "__main__":
     main()
     print('started at', startedAt)
     print('completed at', datetime.datetime.now())
-
-
