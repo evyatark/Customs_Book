@@ -84,12 +84,14 @@ def read_excel_file(filename):
     return df;
 
 
-def read_existing_results_file():
+def read_existing_results_file(results_file_name = None):
     df = None
+    if results_file_name is None:
+        results_file_name = NAME_OF_RESULTS_FILE
     try:
-        df = pd.read_excel(NAME_OF_RESULTS_FILE, sheet_name=0, index_col=0)
+        df = pd.read_excel(results_file_name, sheet_name=0, index_col=0)
     except FileNotFoundError:
-        print('file', NAME_OF_RESULTS_FILE, 'not found!')
+        print('file', results_file_name, 'not found!')
         return None
     # change type
     df.index = df.index.astype(str)
