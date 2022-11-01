@@ -98,6 +98,12 @@ def read_existing_results_file(results_file_name = None):
     return df
 
 
+def write_to_excel_file2(file_name, df):
+    excel_file = pd.ExcelWriter(file_name)
+    df.to_excel(excel_writer=excel_file, sheet_name="items", index=True)
+    excel_file.save()
+
+
 def write_to_excel_file(df):
     excel_file = pd.ExcelWriter(NAME_OF_RESULTS_FILE)
     df.to_excel(excel_writer=excel_file, sheet_name="items", index=True)

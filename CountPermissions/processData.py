@@ -21,8 +21,15 @@ COLUMN_NAME_NUMBER_OF_AGENTS
 COLUMN_NAME_NUMBER_OF_DECLARATIONS
 COLUMN_NAME_EXTRACTED_AT_DATE
 
+- for the DB, you need to start the docker with:
+docker start mysql_server_custom_book
+
+- if running from terminal, activate the virtual env with
+pyenv activate pandas3
+
 """
 from functools import reduce
+from collections import OrderedDict
 import datetime
 
 import readDB
@@ -242,9 +249,108 @@ def main():
     write_to_excel_file(newDF)
 
 
+def print_results(dict_of_TrNumber_to_list_of_items, authorityStr):
+    '''
+
+    :param dict_of_TrNumber_to_list_of_items:
+    :param authorityStr:    for example 'Mechon Hatkanim'
+    :return:
+    '''
+    print('there are', len(dict_of_TrNumber_to_list_of_items.keys()), 'Tkanim of', authorityStr)
+    for teken in dict_of_TrNumber_to_list_of_items.keys():
+        print('Teken', teken, ' : ', len(dict_of_TrNumber_to_list_of_items[teken]), 'customs items need it')
+
+
+def findTkanimRishmiyim(authority, limit = 1000000000, trace_every = 10, authorityStr = None):
+    '''
+
+    :param authority: 4 is Mechon HaTkanim, 24 is Maabedet Bdika, 3 is Misrad Hacalcala?
+    :param limit:
+    :return:
+    '''
+    AuthorityIDPrefix = str(authority) + '-'
+    connection = initialize_connection_and_caches()
+    existingDF = read_existing_results_file()
+    customsItemFullClassificationList = extractCustomItemsAsList(existingDF)
+    count = 0
+    dict_of_TrNumber_to_list_of_items = {}
+    for fullClass in customsItemFullClassificationList:
+        item_id = readDB.get_item_id_of_full_classification(fullClass)
+        if item_id is None:
+            continue
+        flattened_list = readDB.retrieve_for_all_parents(connection, item_id)
+        #print(flattened_list)
+        for data in flattened_list:
+            if data['AuthorityID'].startswith(AuthorityIDPrefix):
+                count = count + 1
+                #print(fullClass, data['AuthorityID'], data['TrNumber'], data['from_item_fc'])
+                theTrNumber = data['TrNumber']
+                if theTrNumber=='0':
+                    continue
+                if theTrNumber not in dict_of_TrNumber_to_list_of_items.keys():
+                    dict_of_TrNumber_to_list_of_items[theTrNumber] = []
+                the_current_list = dict_of_TrNumber_to_list_of_items[theTrNumber]
+                if fullClass not in the_current_list:
+                    the_current_list.append(fullClass)
+                    dict_of_TrNumber_to_list_of_items[theTrNumber] = the_current_list
+                if trace_every > 5 and count > 0 and count % trace_every == 0:
+                    print(count)
+
+        if count > limit:
+            print("breaking after", limit, "items that have Teken")
+            break
+
+    # sort dictionary according to length of the list (of items) that is the value in each entry
+    ordered_d = OrderedDict(sorted(dict_of_TrNumber_to_list_of_items.items(), key=lambda i: -len(i[1])))
+    if authorityStr is None:
+        authorityStr = 'Authority ' + authority
+    print_results(ordered_d, authorityStr)
+
+
+def test():
+    connection = initialize_connection_and_caches()
+    existingDF = read_existing_results_file()
+    customsItemFullClassificationList = extractCustomItemsAsList(existingDF)
+    # fullClass = '3924902000'
+    count = 0
+    dict_of_TrNumber_to_list_of_items = {}
+    for fullClass in customsItemFullClassificationList:
+        item_id = readDB.get_item_id_of_full_classification(fullClass)
+        if item_id is None:
+            continue
+        flattened_list = readDB.retrieve_for_all_parents(connection, item_id)
+        #print(flattened_list)
+        for data in flattened_list:
+            # 4-מכון התקנים
+            if data['AuthorityID'].startswith('4-'):
+                count = count + 1
+                #print(fullClass, data['AuthorityID'], data['TrNumber'], data['from_item_fc'])
+                theTrNumber = data['TrNumber']
+                if theTrNumber not in dict_of_TrNumber_to_list_of_items.keys():
+                    dict_of_TrNumber_to_list_of_items[theTrNumber] = []
+                the_current_list = dict_of_TrNumber_to_list_of_items[theTrNumber]
+                if fullClass not in the_current_list:
+                    the_current_list.append(fullClass)
+                    dict_of_TrNumber_to_list_of_items[theTrNumber] = the_current_list
+        if count > 0 and count % 10 == 0:
+            print(count)
+
+        if count > 100:
+            break
+
+    # print(dict_of_TrNumber_to_list_of_items)
+    print('there are', len(dict_of_TrNumber_to_list_of_items.keys()), 'Tkanim of Mechon Hatkanim')
+    for teken in dict_of_TrNumber_to_list_of_items.keys():
+        print('Teken', teken, ' : ', len(dict_of_TrNumber_to_list_of_items[teken]), 'customs items need it')
+
+
 if __name__ == "__main__":
     startedAt = datetime.datetime.now()
-    main()
+    #main()
+    #test()
+    #findTkanimRishmiyim(4, trace_every=100, authorityStr = 'Mechon Hatkanim')    # , limit=200
+    #findTkanimRishmiyim(24, trace_every=10, authorityStr = 'Maabedet Bdika')    #, limit=200)
+    findTkanimRishmiyim(7, trace_every=10, authorityStr = 'Misrad HaCalcala', limit=10000)    #, limit=200)
     print('started at', startedAt)
     print('completed at', datetime.datetime.now())
 

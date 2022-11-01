@@ -598,6 +598,26 @@ def safe_conf_type(conf_type):
     return conf_type
 
 
+def retrieve_name_of_item(connection, item_id):
+    try:
+        current_date = '2022-01-01'     # TODO not hard-coded
+        query = "select ci.FullClassification, dh.GoodsDescription, dh.EnglishGoodsDescription " + \
+                " from CustomsItem ci,CustomsItemDetailsHistory dh " + \
+                "where ci.ID=dh.CustomsItemID " + \
+                "and ci.CustomsBookTypeID=1 " + \
+                "and dh.EntityStatusID<>4 and dh.EndDate > '" + current_date + "'" + \
+                "and dh.CustomsItemID='" + item_id + "';"
+        results, columns = read_query(connection, query)
+        #print(columns)
+        #print(results)
+        # ('FullClassification', 'GoodsDescription', 'EnglishGoodsDescription')
+        # [('1001190000', 'אחר', 'Other')]
+        return (columns, results[0])
+    except Exception as ex:
+        print("Exception", ex, 'for item', item_id)
+        return None
+
+
 def retrieve_regularity_requirement(connection, item_id):
     """
     This method retrieves from SQL db, **for a single item-id** the data that is displayed in the part of Regulatory Requirements.
